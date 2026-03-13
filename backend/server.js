@@ -235,6 +235,14 @@ async function processVote(username, movieName) {
   const movieTitle = validation.title || normalizedMovie;
   const previousVote = votes[username];
 
+  // Verificar se já votou no mesmo filme
+  if (previousVote && previousVote.toLowerCase() === movieTitle.toLowerCase()) {
+    return {
+      error: true,
+      message: `você já votou em "${movieTitle}"! Use !votar outro filme para trocar.`
+    };
+  }
+
   if (previousVote) {
     if (movies[previousVote]) {
       movies[previousVote].count--;
@@ -309,12 +317,12 @@ async function handleCommand(channel, tags, message) {
   const isMod = tags.mod || tags.badges?.broadcaster;
 
   // Comando: votar em um filme
-  if (message.startsWith('!votar ')) {
+  if (message.startsWith('!votar ') || message.startsWith('!v ')) {
     if (!votingActive) {
       client.say(channel, `@${username} nenhuma votação aberta no momento! Aguarde um mod iniciar com !iniciarvotacao ⏳`);
       return;
     }
-    const movieName = message.slice(7).trim();
+    const movieName = message.startsWith('!v ') ? message.slice(3).trim() : message.slice(7).trim();
     if (!movieName) {
       client.say(channel, `@${username} use: !votar nome do filme 🎬`);
       return;
@@ -341,7 +349,7 @@ async function handleCommand(channel, tags, message) {
     return;
   }
 
-  if (message === '!meuvoto' || message === '!myvote') {
+  if (message === '!meuvoto' || message === '!myvote' || message === '!mv') {
     const currentVote = votes[username];
     if (currentVote) {
       const movieData = movies[currentVote];
@@ -351,7 +359,7 @@ async function handleCommand(channel, tags, message) {
     }
   }
 
-  if (message === '!top3') {
+  if (message === '!top3' || message === '!t3') {
     const ranking = getRanking().slice(0, 3);
     if (ranking.length === 0) {
       client.say(channel, 'Nenhum voto ainda! Use !votar nome do filme 🎬');
@@ -362,7 +370,7 @@ async function handleCommand(channel, tags, message) {
   }
 
   if (message === '!ajuda' || message === '!help') {
-    client.say(channel, '🎬 Comandos: !votar filme | !meuvoto | !top3 | !assistidos');
+    client.say(channel, '🎬 Comandos: !votar(!v) | !meuvoto(!mv) | !top3(!t3) | !assistidos');
   }
 
   if (message === '!assistidos') {
@@ -375,7 +383,7 @@ async function handleCommand(channel, tags, message) {
   }
 
   if (isMod) {
-    if (message === '!iniciarvotacao') {
+    if (message === '!iniciarvotacao' || message === '!iv') {
       votingActive = true;
       votes = {};
       movies = {};
@@ -384,7 +392,7 @@ async function handleCommand(channel, tags, message) {
       client.say(channel, '🎬 Votação ABERTA! Use !votar nome do filme para votar!');
     }
 
-    if (message === '!limparvotos' || message === '!clearvotes') {
+    if (message === '!limparvotos' || message === '!clearvotes' || message === '!lv') {
       votes = {};
       movies = {};
       movieCache = {};
