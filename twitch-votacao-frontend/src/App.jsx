@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Trophy, Users, Film, TrendingUp, Star, Clock } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_API_URL || '';
 const TMDB_IMAGE_URL = 'https://image.tmdb.org/t/p/w500';
-const POLLING_INTERVAL = 2000;
+const POLLING_INTERVAL = 5000;
 
 const getCertificationStyle = (cert) => {
   if (!cert) return { bg: 'bg-gray-600', text: 'N/A' };
@@ -31,7 +31,10 @@ export default function TwitchMovieVoting() {
   const [expandedMovies, setExpandedMovies] = useState({});
   const [watchedMovies, setWatchedMovies] = useState([]);
   const [activeTab, setActiveTab] = useState('votacao');
-  const [prevRanking, setPrevRanking] = useState([]);
+
+  // useRef para evitar recriação do useCallback e reinício do interval
+  const prevRankingRef = useRef([]);
+  const totalVotesRef = useRef(0);
 
   const fetchRanking = useCallback(async () => {
     try {
@@ -41,14 +44,13 @@ export default function TwitchMovieVoting() {
       const data = await response.json();
       setIsConnected(true);
 
-      // Detect new votes by comparing ranking
       const newRanking = data.ranking || [];
       const newTotal = data.totalVotes || 0;
 
-      if (newTotal > totalVotes && prevRanking.length > 0) {
-        // Find the vote that changed
+      // Detectar novos votos comparando com refs (sem recriar callback)
+      if (newTotal > totalVotesRef.current && prevRankingRef.current.length > 0) {
         for (const movie of newRanking) {
-          const prev = prevRanking.find(m => m.name === movie.name);
+          const prev = prevRankingRef.current.find(m => m.name === movie.name);
           if (!prev || movie.count > prev.count) {
             const newVoter = prev
               ? movie.voters.find(v => !prev.voters.includes(v))
@@ -67,7 +69,8 @@ export default function TwitchMovieVoting() {
         }
       }
 
-      setPrevRanking(newRanking);
+      prevRankingRef.current = newRanking;
+      totalVotesRef.current = newTotal;
       setRanking(newRanking);
       setTotalVotes(newTotal);
       setVotingActive(data.votingActive || false);
@@ -76,12 +79,37 @@ export default function TwitchMovieVoting() {
     } catch (error) {
       setIsConnected(false);
     }
-  }, [totalVotes, prevRanking]);
+  }, []);
 
   useEffect(() => {
     fetchRanking();
     const interval = setInterval(fetchRanking, POLLING_INTERVAL);
-    return () => clearInterval(interval);
+
+    // Pausar polling quando aba estiver oculta
+    const handleVisibility = () => {
+      if (document.hidden) {
+        clearInterval(interval);
+      }
+    };
+
+    // Retomar polling quando aba ficar visível
+    let resumeInterval;
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        clearInterval(interval);
+      } else {
+        fetchRanking();
+        resumeInterval = setInterval(fetchRanking, POLLING_INTERVAL);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      if (resumeInterval) clearInterval(resumeInterval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [fetchRanking]);
 
   const getPositionEmoji = (index) => {
