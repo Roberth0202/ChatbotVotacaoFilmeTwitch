@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "buildCommand": "cd twitch-votacao-frontend && npm install && npm run build",
+  "outputDirectory": "twitch-votacao-frontend/build",
+  "framework": null,
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

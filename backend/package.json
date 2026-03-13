@@ -1,31 +1,21 @@
 {
-  "name": "twitch-movie-voting-backend",
+  "name": "twitch-movie-voting-bot",
   "version": "1.0.0",
-  "description": "Sistema de votação de filmes via chat da Twitch",
-  "main": "server.js",
+  "description": "Bot da Twitch para votação de filmes (roda no seu PC)",
+  "main": "bot.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js"
+    "start": "node bot.js"
   },
   "keywords": [
     "twitch",
     "voting",
     "movies",
-    "chat",
-    "websocket"
+    "chat"
   ],
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "cors": "^2.8.5",
     "dotenv": "^16.0.3",
-    "express": "^4.18.2",
-    "express-rate-limit": "^8.3.1",
-    "helmet": "^8.1.0",
-    "socket.io": "^4.6.1",
     "tmi.js": "^1.8.5"
-  },
-  "devDependencies": {
-    "nodemon": "^2.0.22"
   }
 }

@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import io from 'socket.io-client';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Trophy, Users, Film, TrendingUp, Star, Clock } from 'lucide-react';
 
-const SOCKET_URL = 'http://localhost:3001';
+const API_URL = process.env.REACT_APP_API_URL || '';
 const TMDB_IMAGE_URL = 'https://image.tmdb.org/t/p/w500';
+const POLLING_INTERVAL = 2000;
 
 const getCertificationStyle = (cert) => {
   if (!cert) return { bg: 'bg-gray-600', text: 'N/A' };
@@ -31,44 +31,58 @@ export default function TwitchMovieVoting() {
   const [expandedMovies, setExpandedMovies] = useState({});
   const [watchedMovies, setWatchedMovies] = useState([]);
   const [activeTab, setActiveTab] = useState('votacao');
+  const [prevRanking, setPrevRanking] = useState([]);
+
+  const fetchRanking = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/ranking`);
+      if (!response.ok) throw new Error('API error');
+
+      const data = await response.json();
+      setIsConnected(true);
+
+      // Detect new votes by comparing ranking
+      const newRanking = data.ranking || [];
+      const newTotal = data.totalVotes || 0;
+
+      if (newTotal > totalVotes && prevRanking.length > 0) {
+        // Find the vote that changed
+        for (const movie of newRanking) {
+          const prev = prevRanking.find(m => m.name === movie.name);
+          if (!prev || movie.count > prev.count) {
+            const newVoter = prev
+              ? movie.voters.find(v => !prev.voters.includes(v))
+              : movie.voters[movie.voters.length - 1];
+
+            if (newVoter) {
+              setLastVote({
+                username: newVoter,
+                movie: movie.name,
+                totalVotes: newTotal
+              });
+              setTimeout(() => setLastVote(null), 4000);
+            }
+            break;
+          }
+        }
+      }
+
+      setPrevRanking(newRanking);
+      setRanking(newRanking);
+      setTotalVotes(newTotal);
+      setVotingActive(data.votingActive || false);
+      if (data.watchedMovies) setWatchedMovies(data.watchedMovies);
+
+    } catch (error) {
+      setIsConnected(false);
+    }
+  }, [totalVotes, prevRanking]);
 
   useEffect(() => {
-    const socket = io(SOCKET_URL);
-
-    socket.on('connect', () => {
-      setIsConnected(true);
-    });
-
-    socket.on('disconnect', () => {
-      setIsConnected(false);
-    });
-
-    socket.on('initial-state', (data) => {
-      setRanking(data.ranking);
-      setTotalVotes(data.totalVotes);
-      if (data.votingActive !== undefined) setVotingActive(data.votingActive);
-      if (data.watchedMovies) setWatchedMovies(data.watchedMovies);
-    });
-
-    socket.on('voting-status', (data) => {
-      setVotingActive(data.active);
-    });
-
-    socket.on('watched-update', (data) => {
-      if (data.watchedMovies) setWatchedMovies(data.watchedMovies);
-    });
-
-    socket.on('vote-update', (data) => {
-      setRanking(data.ranking);
-      if (data.lastVote) {
-        setLastVote(data.lastVote);
-        setTotalVotes(data.lastVote.totalVotes);
-        setTimeout(() => setLastVote(null), 4000);
-      }
-    });
-
-    return () => socket.disconnect();
-  }, []);
+    fetchRanking();
+    const interval = setInterval(fetchRanking, POLLING_INTERVAL);
+    return () => clearInterval(interval);
+  }, [fetchRanking]);
 
   const getPositionEmoji = (index) => {
     if (index === 0) return '🥇';
@@ -97,7 +111,7 @@ export default function TwitchMovieVoting() {
               <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-3 py-1.5 sm:px-4 sm:py-2 min-h-[44px] touch-manipulation">
                 <div className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full motion-safe:transition-colors ${isConnected ? 'bg-emerald-400 motion-safe:animate-pulse shadow-lg shadow-emerald-400/50' : 'bg-red-500'}`} />
                 <span className="text-xs sm:text-sm text-gray-300/70">
-                  {isConnected ? 'Conectado ao chat' : 'Desconectado'}
+                  {isConnected ? 'Conectado' : 'Desconectado'}
                 </span>
               </div>
               <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 sm:px-4 sm:py-2 min-h-[44px] touch-manipulation ${
@@ -227,16 +241,7 @@ export default function TwitchMovieVoting() {
             <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 sm:p-4 backdrop-blur-xl">
               <p className="text-center text-xs sm:text-base">
                 <span className="font-bold text-emerald-300">@{lastVote.username}</span>
-                {lastVote.previousVote ? (
-                  <>
-                    {' '}mudou de <span className="line-through text-gray-400/70">{lastVote.previousVote}</span> para{' '}
-                    <span className="font-bold text-yellow-300">{lastVote.movie}</span> ✨
-                  </>
-                ) : (
-                  <>
-                    {' '}votou em <span className="font-bold text-yellow-300">{lastVote.movie}</span> ✅
-                  </>
-                )}
+                {' '}votou em <span className="font-bold text-yellow-300">{lastVote.movie}</span> ✅
               </p>
             </div>
           </div>
@@ -438,7 +443,7 @@ export default function TwitchMovieVoting() {
               </div>
             ) : (
               <div className="space-y-3 sm:space-y-4">
-                {[...watchedMovies].reverse().map((movie, i) => {
+                {watchedMovies.map((movie, i) => {
                   const certStyle = getCertificationStyle(movie.certification);
                   const date = movie.markedAt ? new Date(movie.markedAt) : null;
                   return (
