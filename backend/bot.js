@@ -71,9 +71,9 @@ client.on('message', async (channel, tags, message, self) => {
   const isMod = tags.mod || tags.badges?.broadcaster === '1' || tags.username === TWITCH_CHANNEL.toLowerCase();
   console.log(`[CMD] user=${username} isMod=${isMod} cmd="${msg}"`);
 
-  // ── !votar ──
-  if (msg.startsWith('!votar ')) {
-    const movieName = msg.slice(7).trim();
+  // ── !votar / !v ──
+  if (msg.startsWith('!votar ') || msg.startsWith('!v ')) {
+    const movieName = msg.startsWith('!v ') ? msg.slice(3).trim() : msg.slice(7).trim();
     if (!movieName) {
       client.say(channel, `@${username} use: !votar nome do filme 🎬`);
       return;
@@ -99,8 +99,8 @@ client.on('message', async (channel, tags, message, self) => {
     return;
   }
 
-  // ── !meuvoto ──
-  if (msg === '!meuvoto' || msg === '!myvote') {
+  // ── !meuvoto / !mv ──
+  if (msg === '!meuvoto' || msg === '!myvote' || msg === '!mv') {
     try {
       const response = await fetch(`${API_BASE_URL}/api/ranking`);
       const data = await response.json();
@@ -116,8 +116,8 @@ client.on('message', async (channel, tags, message, self) => {
     return;
   }
 
-  // ── !top3 ──
-  if (msg === '!top3') {
+  // ── !top3 / !t3 ──
+  if (msg === '!top3' || msg === '!t3') {
     try {
       const response = await fetch(`${API_BASE_URL}/api/ranking`);
       const data = await response.json();
@@ -136,7 +136,7 @@ client.on('message', async (channel, tags, message, self) => {
 
   // ── !ajuda ──
   if (msg === '!ajuda' || msg === '!help') {
-    client.say(channel, '🎬 Comandos: !votar filme | !meuvoto | !top3 | !assistidos');
+    client.say(channel, '🎬 Comandos: !votar(!v) | !meuvoto(!mv) | !top3(!t3) | !assistidos');
     return;
   }
 
@@ -160,7 +160,7 @@ client.on('message', async (channel, tags, message, self) => {
 
   // ── Comandos de Mod ──
   if (isMod) {
-    if (msg === '!iniciarvotacao') {
+    if (msg === '!iniciarvotacao' || msg === '!iv') {
       const result = await apiRequest('control', { action: 'start' });
       if (result.success) {
         client.say(channel, '🎬 Votação ABERTA! Use !votar nome do filme para votar!');
@@ -170,7 +170,7 @@ client.on('message', async (channel, tags, message, self) => {
       return;
     }
 
-    if (msg === '!limparvotos' || msg === '!clearvotes') {
+    if (msg === '!limparvotos' || msg === '!clearvotes' || msg === '!lv') {
       const result = await apiRequest('control', { action: 'clear' });
       if (result.success) {
         client.say(channel, '🗑️ Os votos foram limpos!');
