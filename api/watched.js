@@ -4,7 +4,7 @@ const { validateMovie } = require('./_lib/tmdb');
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
@@ -69,6 +69,29 @@ module.exports = async function handler(req, res) {
       await db.collection('watched').insertOne(watchedEntry);
 
       return res.status(201).json({ success: true, movie: watchedEntry });
+    }
+
+    if (req.method === 'DELETE') {
+      if (!requireAdmin(req, res)) return;
+
+      const { movieName } = req.body || {};
+
+      if (!movieName) {
+        return res.status(400).json({ error: 'movieName is required' });
+      }
+
+      const result = await db.collection('watched').deleteOne({
+        titleLower: movieName.toLowerCase().trim()
+      });
+
+      if (result.deletedCount === 0) {
+        return res.status(404).json({
+          error: `"${movieName}" not found in watched list`,
+          code: 'NOT_FOUND'
+        });
+      }
+
+      return res.status(200).json({ success: true, removed: movieName });
     }
 
     return res.status(405).json({ error: 'Method not allowed' });

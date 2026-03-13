@@ -3,7 +3,7 @@ import { Trophy, Users, Film, TrendingUp, Star, Clock } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_API_URL || '';
 const TMDB_IMAGE_URL = 'https://image.tmdb.org/t/p/w500';
-const POLLING_INTERVAL = 5000;
+const POLLING_INTERVAL = 2000;
 
 const getCertificationStyle = (cert) => {
   if (!cert) return { bg: 'bg-gray-600', text: 'N/A' };

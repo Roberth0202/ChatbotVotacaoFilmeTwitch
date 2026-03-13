@@ -213,6 +213,38 @@ client.on('message', async (channel, tags, message, self) => {
       }
       return;
     }
+
+    // ── !remassistido / !ra ──
+    if (msg.startsWith('!remassistido ') || msg.startsWith('!ra ')) {
+      const movieName = msg.startsWith('!ra ') ? msg.slice(4).trim() : msg.slice(14).trim();
+      if (!movieName) {
+        client.say(channel, `@${username} use: !remassistido nome do filme 🎬`);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/watched`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${ADMIN_TOKEN}`
+          },
+          body: JSON.stringify({ movieName })
+        });
+        const result = await response.json();
+
+        if (result.success) {
+          client.say(channel, `🗑️ "${movieName}" removido da lista de assistidos por @${username}!`);
+        } else if (result.code === 'NOT_FOUND') {
+          client.say(channel, `@${username} esse filme não está na lista de assistidos.`);
+        } else {
+          client.say(channel, `@${username} erro ao remover filme.`);
+        }
+      } catch (e) {
+        client.say(channel, `@${username} erro ao remover filme.`);
+      }
+      return;
+    }
   }
 });
 
