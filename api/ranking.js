@@ -56,6 +56,16 @@ module.exports = async function handler(req, res) {
     });
   } catch (error) {
     console.error('[API /ranking] Error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({
+      error: 'Internal server error',
+      details: error.message,
+      hint: error.message.includes('MONGODB_URI')
+        ? 'MONGODB_URI não está configurada nas variáveis de ambiente da Vercel'
+        : error.message.includes('authentication')
+        ? 'Credenciais do MongoDB incorretas na connection string'
+        : error.message.includes('connect')
+        ? 'Não foi possível conectar ao MongoDB. Verifique: 1) IP 0.0.0.0/0 no Network Access do Atlas, 2) Connection string correta'
+        : 'Erro inesperado'
+    });
   }
 };
