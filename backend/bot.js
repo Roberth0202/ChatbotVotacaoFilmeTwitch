@@ -26,7 +26,7 @@ if (!TWITCH_USERNAME || !TWITCH_OAUTH || !TWITCH_CHANNEL) {
 }
 
 const client = new tmi.Client({
-  options: { debug: false },
+  options: { debug: true },
   identity: {
     username: TWITCH_USERNAME,
     password: TWITCH_OAUTH
@@ -61,13 +61,15 @@ function sanitizeInput(input) {
 
 // Escutar mensagens do chat
 client.on('message', async (channel, tags, message, self) => {
+  console.log(`[MSG] self=${self} user=${tags.username} msg="${message}"`);
   if (self) return;
 
   const msg = sanitizeInput(message);
   if (!msg.startsWith('!')) return;
 
   const username = tags.username;
-  const isMod = tags.mod || tags.badges?.broadcaster;
+  const isMod = tags.mod || tags.badges?.broadcaster === '1' || tags.username === TWITCH_CHANNEL.toLowerCase();
+  console.log(`[CMD] user=${username} isMod=${isMod} cmd="${msg}"`);
 
   // ── !votar ──
   if (msg.startsWith('!votar ')) {
