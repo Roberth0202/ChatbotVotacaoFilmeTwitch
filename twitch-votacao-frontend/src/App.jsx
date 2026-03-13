@@ -85,14 +85,7 @@ export default function TwitchMovieVoting() {
     fetchRanking();
     const interval = setInterval(fetchRanking, POLLING_INTERVAL);
 
-    // Pausar polling quando aba estiver oculta
-    const handleVisibility = () => {
-      if (document.hidden) {
-        clearInterval(interval);
-      }
-    };
-
-    // Retomar polling quando aba ficar visível
+    // Pausar/retomar polling baseado na visibilidade da aba
     let resumeInterval;
     const handleVisibilityChange = () => {
       if (document.hidden) {
