@@ -38,12 +38,17 @@ module.exports = async function handler(req, res) {
   try {
     const { db } = await connectToDatabase();
 
-    const session = await db.collection('session').findOne({ _id: 'current' });
+    // Roda essas 3 tarefas PESADAS ao mesmo tempo (em paralelo) em vez de uma por uma!
+    const [session, validation, previousVoteDoc] = await Promise.all([
+      db.collection('session').findOne({ _id: 'current' }),
+      validateMovie(sanitizedMovie),
+      db.collection('votes').findOne({ username })
+    ]);
+
     if (!session?.votingActive) {
       return res.status(400).json({ error: 'Voting is not active', code: 'VOTING_CLOSED' });
     }
 
-    const validation = await validateMovie(sanitizedMovie);
     if (!validation.valid) {
       return res.status(400).json({
         error: `"${sanitizedMovie}" is not a valid movie`,
@@ -52,9 +57,6 @@ module.exports = async function handler(req, res) {
     }
 
     const movieTitle = validation.title || sanitizedMovie;
-
-    // Check previous vote
-    const previousVoteDoc = await db.collection('votes').findOne({ username });
     const previousVote = previousVoteDoc?.movie || null;
 
     // Upsert vote
@@ -75,14 +77,13 @@ module.exports = async function handler(req, res) {
       { upsert: true }
     );
 
-    const totalVotes = await db.collection('votes').countDocuments();
-
+    // Retirada da contagem de `countDocuments` pois o bot não utiliza isso e é lento em coleções grandes.
+    
     return res.status(200).json({
       success: true,
       username,
       movie: movieTitle,
       previousVote,
-      totalVotes,
       year: validation.year
     });
   } catch (error) {
