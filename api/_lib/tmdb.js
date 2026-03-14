@@ -1,4 +1,5 @@
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
+const { connectToDatabase } = require('./mongodb');
 
 function getTmdbHeaders() {
   return {
@@ -13,7 +14,19 @@ async function validateMovie(movieName) {
     return { valid: false, error: 'TMDB_API_KEY not configured' };
   }
 
+  const normalizedQuery = movieName.trim().toLowerCase();
+
   try {
+    const { db } = await connectToDatabase();
+    
+    // 1. Tentar pegar do Cache primeiro
+    const cachedMovie = await db.collection('movie_cache').findOne({ query: normalizedQuery });
+    if (cachedMovie) {
+      console.log(`[TMDB CACHE HIT] "${movieName}"`);
+      return cachedMovie.result;
+    }
+
+    console.log(`[TMDB API FETCH] "${movieName}"`);
     const searchUrl = `${TMDB_BASE_URL}/search/movie?query=${encodeURIComponent(movieName)}&language=pt-BR`;
     const response = await fetch(searchUrl, { headers: getTmdbHeaders() });
 
@@ -47,7 +60,7 @@ async function validateMovie(movieName) {
         console.error('[TMDB] Error fetching certification:', e.message);
       }
 
-      return {
+      const resultObj = {
         valid: true,
         title: movie.title,
         originalTitle: movie.original_title,
@@ -57,9 +70,26 @@ async function validateMovie(movieName) {
         voteAverage: movie.vote_average || null,
         certification
       };
+
+      // 2. Salva o resultado válido no cache
+      await db.collection('movie_cache').insertOne({
+        query: normalizedQuery,
+        result: resultObj,
+        createdAt: new Date()
+      });
+
+      return resultObj;
     }
 
-    return { valid: false };
+    // 3. Salva o "Não encontrado" no cache também, para evitar spam
+    const notFoundResult = { valid: false };
+    await db.collection('movie_cache').insertOne({
+      query: normalizedQuery,
+      result: notFoundResult,
+      createdAt: new Date()
+    });
+
+    return notFoundResult;
   } catch (error) {
     console.error('[TMDB] Request error:', error.message);
     return { valid: false };

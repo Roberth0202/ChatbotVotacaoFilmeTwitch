@@ -59,6 +59,45 @@ function sanitizeInput(input) {
   return input.trim().slice(0, MAX_INPUT_LENGTH).replace(/[<>{}]/g, '');
 }
 
+// --- OTMIZAÇÃO 1: BATCHING DE VOTOS ---
+// Fila para guardar os votos em memória
+let voteBuffer = [];
+
+// Envia os votos acumulados a cada 3 segundos
+setInterval(async () => {
+  if (voteBuffer.length === 0) return;
+
+  // Tira todos os votos da fila e guarda pra processar
+  const batchToProcess = [...voteBuffer];
+  voteBuffer = []; // Limpa a fila para novos votos
+
+  try {
+    const result = await apiRequest('vote-batch', { votes: batchToProcess });
+    
+    if (result.success) {
+      // Opcional: Responder no chat para cada voto processado com sucesso.
+      // Se tiver muuuita gente votando, isso pode dar flood do seu bot na Twitch,
+      // então você pode querer comentar esse bloco no futuro se o chat ficar poluído.
+      result.results.forEach(res => {
+        if (res.error) {
+           client.say(TWITCH_CHANNEL, `@${res.username} erro ao computar voto: ${res.error}`);
+        } else if (res.previousVote) {
+           client.say(TWITCH_CHANNEL, `@${res.username} mudou seu voto de "${res.previousVote}" para "${res.movie}" ✅`);
+        } else {
+           client.say(TWITCH_CHANNEL, `@${res.username} votou em "${res.movie}" ✅`);
+        }
+      });
+    } else {
+      if (result.code === 'VOTING_CLOSED') {
+         client.say(TWITCH_CHANNEL, `❌ Nenhuma votação aberta no momento!`);
+      }
+    }
+  } catch (err) {
+    console.error('[BATCH] Erro ao enviar pacote de votos:', err);
+  }
+}, 3000); // 3000 ms = 3 segundos
+// ----------------------------------------
+
 // Escutar mensagens do chat
 client.on('message', async (channel, tags, message, self) => {
   console.log(`[MSG] self=${self} user=${tags.username} msg="${message}"`);
@@ -79,23 +118,11 @@ client.on('message', async (channel, tags, message, self) => {
       return;
     }
 
-    const result = await apiRequest('vote', { username, movieName });
-
-    if (result.error) {
-      if (result.code === 'VOTING_CLOSED') {
-        client.say(channel, `@${username} nenhuma votação aberta no momento! Aguarde um mod iniciar com !iniciarvotacao ⏳`);
-      } else if (result.code === 'INVALID_MOVIE') {
-        client.say(channel, `@${username} "${movieName}" não parece ser um filme válido. Tente novamente com o nome correto! 🎬`);
-      } else {
-        client.say(channel, `@${username} erro ao votar. Tente novamente!`);
-      }
-    } else if (result.success) {
-      if (result.previousVote) {
-        client.say(channel, `@${username} mudou seu voto de "${result.previousVote}" para "${result.movie}"${result.year ? ` (${result.year})` : ''} ✅`);
-      } else {
-        client.say(channel, `@${username} votou em "${result.movie}"${result.year ? ` (${result.year})` : ''} ✅`);
-      }
-    }
+    // Em vez de bater na API, adiciona na Fila na memória RAM do seu PC
+    voteBuffer.push({ username, movieName });
+    // O bot fica "calado" aqui, ele vai responder lá no setInterval acima
+    // quando o pacote voltar da Vercel.
+    
     return;
   }
 

@@ -20,29 +20,39 @@ module.exports = async function handler(req, res) {
     const session = await db.collection('session').findOne({ _id: 'current' });
     const votingActive = session?.votingActive || false;
 
-    const votesArr = await db.collection('votes').find({}).toArray();
-
-    const movies = {};
-    for (const v of votesArr) {
-      const title = v.movie;
-      if (!movies[title]) {
-        movies[title] = {
-          count: 0,
-          voters: [],
-          posterPath: v.posterPath || null,
-          year: v.year || null,
-          overview: v.overview || null,
-          voteAverage: v.voteAverage || null,
-          certification: v.certification || null
-        };
+    // O MongoDB faz todo o trabalho pesado de contar, agrupar as informações do filme e coletar os nomes dos votantes
+    const rankingData = await db.collection('votes').aggregate([
+      {
+        $group: {
+          _id: "$movie", // Agrupa pelo nome do filme
+          count: { $sum: 1 }, // Conta os votos
+          voters: { $push: "$username" }, // Cria um array com o nome de quem votou
+          posterPath: { $first: "$posterPath" }, // Pega o primeiro poster q encontrar
+          year: { $first: "$year" },
+          overview: { $first: "$overview" },
+          voteAverage: { $first: "$voteAverage" },
+          certification: { $first: "$certification" }
+        }
+      },
+      {
+        $sort: { count: -1 } // Já devolve ordenado do maior pro menor
       }
-      movies[title].count++;
-      movies[title].voters.push(v.username);
-    }
+    ]).toArray();
 
-    const ranking = Object.entries(movies)
-      .map(([name, data]) => ({ name, ...data }))
-      .sort((a, b) => b.count - a.count);
+    // Calcula o total de votos somando a contagem de cada filme
+    const totalVotes = rankingData.reduce((acc, curr) => acc + curr.count, 0);
+
+    // Formata do jeito que o frontend já espera
+    const ranking = rankingData.map(data => ({
+      name: data._id,
+      count: data.count,
+      voters: data.voters,
+      posterPath: data.posterPath,
+      year: data.year,
+      overview: data.overview,
+      voteAverage: data.voteAverage,
+      certification: data.certification
+    }));
 
     const watchedMovies = await db.collection('watched').find({}).sort({ markedAt: -1 }).toArray();
 
