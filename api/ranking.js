@@ -61,7 +61,7 @@ module.exports = async function handler(req, res) {
 
     return res.status(200).json({
       ranking,
-      totalVotes: votesArr.length,
+      totalVotes,
       votingActive,
       watchedMovies: cleanWatched
     });
