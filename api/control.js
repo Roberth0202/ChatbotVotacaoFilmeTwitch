@@ -19,7 +19,7 @@ module.exports = async function handler(req, res) {
   const { action } = req.body || {};
 
   if (!action) {
-    return res.status(400).json({ error: 'action is required (start, end, clear)' });
+    return res.status(400).json({ error: 'action is required (start, stop, clear)' });
   }
 
   try {
@@ -36,7 +36,7 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ success: true, message: 'Voting started' });
       }
 
-      case 'end': {
+      case 'stop': {
         // Get winner before closing
         const votesArr = await db.collection('votes').find({}).toArray();
         const movies = {};
@@ -64,7 +64,7 @@ module.exports = async function handler(req, res) {
       }
 
       default:
-        return res.status(400).json({ error: 'Invalid action. Use: start, end, clear' });
+        return res.status(400).json({ error: 'Invalid action. Use: start, stop, clear' });
     }
   } catch (error) {
     console.error('[API /control] Error:', error);
