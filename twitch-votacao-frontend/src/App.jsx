@@ -563,7 +563,6 @@ export default function TwitchMovieVoting() {
               <div className="flex flex-wrap gap-4">
                 <button
                   onClick={async () => {
-                    if (!window.confirm(`Deseja ${votingActive ? 'ENCERRAR' : 'INICIAR'} a votação?`)) return;
                     try {
                       const res = await fetch(`${API_URL}/api/control`, {
                         method: 'POST',
@@ -574,7 +573,7 @@ export default function TwitchMovieVoting() {
                         body: JSON.stringify({ action: votingActive ? 'stop' : 'start' })
                       });
                       if (res.ok) fetchRanking();
-                      else alert('Erro ao alterar votação. Token expirado?');
+                      else console.error('Erro ao alterar votação. Token expirado?');
                     } catch (e) {
                       console.error(e);
                     }
@@ -590,8 +589,6 @@ export default function TwitchMovieVoting() {
 
                 <button
                   onClick={async () => {
-                    const pass = window.prompt("Digite 'limpar' para zerar TODOS os votos atuais:");
-                    if (pass !== 'limpar') return;
                     try {
                       const res = await fetch(`${API_URL}/api/control`, {
                         method: 'POST',
@@ -602,7 +599,7 @@ export default function TwitchMovieVoting() {
                         body: JSON.stringify({ action: 'clear' })
                       });
                       if (res.ok) fetchRanking();
-                      else alert('Erro ao limpar votação.');
+                      else console.error('Erro ao limpar votação.');
                     } catch (e) {
                       console.error(e);
                     }
@@ -631,7 +628,6 @@ export default function TwitchMovieVoting() {
                       </div>
                       <button
                         onClick={async () => {
-                          if (!window.confirm(`Mover "${movie.name}" para a lista de filmes Assistidos e encerrar seus votos?`)) return;
                           try {
                             const res = await fetch(`${API_URL}/api/movies/watch`, {
                               method: 'POST',
@@ -643,10 +639,9 @@ export default function TwitchMovieVoting() {
                             });
                             if (res.ok) {
                               fetchRanking(); // Recarrega rank + assistidos
-                              alert(`✅ ${movie.name} movido para assistidos com sucesso!`);
                             } else {
                               const err = await res.json();
-                              alert(`Erro: ${err.error}`);
+                              console.error(`Erro: ${err.error}`);
                             }
                           } catch (e) {
                             console.error(e);
@@ -669,12 +664,9 @@ export default function TwitchMovieVoting() {
           {isAdmin ? (
             <button 
               onClick={() => {
-                const logout = window.confirm('Deseja sair do Modo Master?');
-                if (logout) {
-                  localStorage.removeItem('adminToken');
-                  setIsAdmin(false);
-                  setActiveTab('votacao');
-                }
+                localStorage.removeItem('adminToken');
+                setIsAdmin(false);
+                setActiveTab('votacao');
               }}
               className="text-xs px-4 py-2 rounded-full border border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10 transition-all flex items-center gap-2"
             >
