@@ -35,6 +35,7 @@ export default function TwitchMovieVoting() {
   const [activeTab, setActiveTab] = useState('votacao'); // 'votacao', 'assistidos', 'admin'
   const [isAdmin, setIsAdmin] = useState(() => !!localStorage.getItem('adminToken'));
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isProcessingControl, setIsProcessingControl] = useState(false);
 
   // Hook da Twitch para WebSockets
   const { chatConnected, lastVoteEvent } = useTwitchChat(TWITCH_CHANNEL);
@@ -208,9 +209,19 @@ export default function TwitchMovieVoting() {
             <div className="flex items-center gap-2 sm:gap-3">
               <div className="inline-flex items-center gap-2 bg-white/5 border border-white/5 rounded-full px-3 py-1.5">
                 <div className={`w-2 h-2 rounded-full ${chatConnected ? 'bg-cyan-400 motion-safe:animate-pulse' : 'bg-red-500'}`} />
-                <span className="text-xs text-gray-400">
-                  {chatConnected ? 'Twitch Sync' : 'Reconectando Chat...'}
+                <span className="text-xs text-gray-400 hidden sm:inline">
+                  {chatConnected ? 'Chat Conectado' : 'Sem Chat'}
                 </span>
+                {chatConnected && isAdmin && (
+                  <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded ml-1 border border-emerald-500/20">
+                    Lendo Votos
+                  </span>
+                )}
+                {chatConnected && !isAdmin && (
+                  <span className="text-[10px] text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded ml-1 border border-red-500/20" title="Faça login como Admin para contabilizar votos">
+                    Votos Pausados (Faça Login)
+                  </span>
+                )}
               </div>
               <div className="inline-flex items-center gap-2 bg-white/5 border border-white/5 rounded-full px-3 py-1.5">
                 <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400 motion-safe:animate-pulse' : 'bg-red-500'}`} />
@@ -562,7 +573,9 @@ export default function TwitchMovieVoting() {
               </h2>
               <div className="flex flex-wrap gap-4">
                 <button
+                  disabled={isProcessingControl}
                   onClick={async () => {
+                    setIsProcessingControl(true);
                     try {
                       const res = await fetch(`${API_URL}/api/control`, {
                         method: 'POST',
@@ -576,19 +589,24 @@ export default function TwitchMovieVoting() {
                       else console.error('Erro ao alterar votação. Token expirado?');
                     } catch (e) {
                       console.error(e);
+                    } finally {
+                      setIsProcessingControl(false);
                     }
                   }}
                   className={`px-6 py-3 rounded-lg font-bold text-sm transition-all flex items-center justify-center min-w-[140px] ${
+                    isProcessingControl ? 'opacity-50 cursor-not-allowed bg-gray-500/20 text-gray-400' :
                     votingActive 
                       ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30 border border-red-500/30' 
                       : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30'
                   }`}
                 >
-                  {votingActive ? '⏸ Pausar Votação' : '▶ Abrir Votação'}
+                  {isProcessingControl ? 'Aguarde...' : (votingActive ? '⏸ Pausar Votação' : '▶ Abrir Votação')}
                 </button>
 
                 <button
+                  disabled={isProcessingControl}
                   onClick={async () => {
+                    setIsProcessingControl(true);
                     try {
                       const res = await fetch(`${API_URL}/api/control`, {
                         method: 'POST',
@@ -602,11 +620,16 @@ export default function TwitchMovieVoting() {
                       else console.error('Erro ao limpar votação.');
                     } catch (e) {
                       console.error(e);
+                    } finally {
+                      setIsProcessingControl(false);
                     }
                   }}
-                  className="px-6 py-3 rounded-lg font-bold text-sm bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 border border-orange-500/30 transition-all flex items-center justify-center min-w-[140px]"
+                  className={`px-6 py-3 rounded-lg font-bold text-sm transition-all flex items-center justify-center min-w-[140px] ${
+                    isProcessingControl ? 'opacity-50 cursor-not-allowed bg-gray-500/20 text-gray-400' :
+                    'bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 border border-orange-500/30'
+                  }`}
                 >
-                  🗑️ Limpar Votos
+                  {isProcessingControl ? 'Aguarde...' : '🗑️ Limpar Votos'}
                 </button>
               </div>
             </div>
@@ -685,10 +708,10 @@ export default function TwitchMovieVoting() {
                 window.location.href = authUrl;
               }}
               disabled={isLoggingIn}
-              className="text-xs px-4 py-2 rounded-full border border-[#9146FF] text-[#9146FF] hover:bg-[#9146FF] hover:text-white transition-all flex items-center gap-2"
+              className="text-sm px-6 py-2.5 rounded-full bg-[#9146FF] text-white hover:bg-[#772ce8] font-semibold transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#9146FF]/20"
             >
-              <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/></svg>
-              {isLoggingIn ? 'Autenticando...' : 'Login com a Twitch (Apenas Mods)'}
+              <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/></svg>
+              {isLoggingIn ? 'Autenticando...' : 'Entrar com Twitch'}
             </button>
           )}
         </div>
