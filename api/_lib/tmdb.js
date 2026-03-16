@@ -96,4 +96,39 @@ async function validateMovie(movieName) {
   }
 }
 
-module.exports = { validateMovie };
+async function searchMovies(query) {
+  const TMDB_TOKEN = process.env.TMDB_API_KEY;
+  if (!TMDB_TOKEN) {
+    return { results: [], error: 'TMDB_API_KEY not configured' };
+  }
+
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return { results: [] };
+
+  try {
+    const searchUrl = `${TMDB_BASE_URL}/search/movie?query=${encodeURIComponent(query)}&language=pt-BR&page=1`;
+    const response = await fetch(searchUrl, { headers: getTmdbHeaders() });
+
+    if (!response.ok) {
+      return { results: [] };
+    }
+
+    const data = await response.json();
+    if (data.results && data.results.length > 0) {
+      const results = data.results.slice(0, 5).map(movie => ({
+        id: movie.id,
+        title: movie.title,
+        originalTitle: movie.original_title,
+        posterPath: movie.poster_path,
+        year: movie.release_date ? movie.release_date.split('-')[0] : null,
+      }));
+      return { results };
+    }
+    return { results: [] };
+  } catch (error) {
+    console.error('[TMDB] Search request error:', error.message);
+    return { results: [] };
+  }
+}
+
+module.exports = { validateMovie, searchMovies };

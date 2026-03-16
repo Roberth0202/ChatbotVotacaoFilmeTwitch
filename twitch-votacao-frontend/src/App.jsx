@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Film, TrendingUp, Star, Clock } from 'lucide-react';
+import { Film, TrendingUp, Star, Clock, Search, Loader2 } from 'lucide-react';
 import { useTwitchChat } from './hooks/useTwitchChat';
 
 const API_URL = process.env.REACT_APP_API_URL || '';
@@ -36,9 +36,42 @@ export default function TwitchMovieVoting() {
   const [isAdmin, setIsAdmin] = useState(() => !!localStorage.getItem('adminToken'));
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isProcessingControl, setIsProcessingControl] = useState(false);
+  const [manualSearch, setManualSearch] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
 
   // Hook da Twitch para WebSockets
   const { chatConnected, lastVoteEvent } = useTwitchChat(TWITCH_CHANNEL);
+
+  // Effect para a busca automática ao digitar
+  useEffect(() => {
+    if (!manualSearch.trim() || manualSearch.length < 2) {
+      setSearchResults([]);
+      setShowDropdown(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const res = await fetch(`${API_URL}/api/movies/search?query=${encodeURIComponent(manualSearch)}`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setSearchResults(data.results || []);
+          setShowDropdown(true);
+        }
+      } catch (e) {
+        console.error('Busca TMDB falhou', e);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [manualSearch]);
 
   // useRef para evitar recriação do useCallback e reinício do interval
   const prevRankingRef = useRef([]);
@@ -483,7 +516,105 @@ export default function TwitchMovieVoting() {
 
         {/* ── Aba Assistidos ── */}
         {activeTab === 'assistidos' && (
-          <div>
+          <div className="space-y-6">
+            {isAdmin && (
+              <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-6 sm:p-8 relative">
+                <h3 className="text-gray-300 font-medium mb-4 text-sm">Adicionar filme aos assistidos</h3>
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!manualSearch.trim()) return;
+                  try {
+                    const res = await fetch(`${API_URL}/api/movies/watch`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+                      },
+                      body: JSON.stringify({ movieName: manualSearch.trim(), markedBy: 'Moderador' })
+                    });
+                    if (res.ok) {
+                      setManualSearch('');
+                      setSearchResults([]);
+                      setShowDropdown(false);
+                      fetchRanking();
+                    } else {
+                      const err = await res.json();
+                      alert(`Erro: ${err.error}`);
+                    }
+                  } catch (e) {
+                    console.error(e);
+                    alert('Erro de conexão ao salvar.');
+                  }
+                }} className="flex flex-col sm:flex-row gap-3 relative">
+                  
+                  <div className="relative flex-1">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                      {isSearching ? (
+                        <Loader2 className="w-4 h-4 text-emerald-500 animate-spin" />
+                      ) : (
+                        <Search className="w-4 h-4 text-gray-500" />
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      value={manualSearch}
+                      onChange={(e) => {
+                        setManualSearch(e.target.value);
+                        setShowDropdown(true);
+                      }}
+                      onFocus={() => { if (searchResults.length > 0) setShowDropdown(true); }}
+                      onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+                      placeholder="Busque por um filme..."
+                      className="w-full bg-black/40 border border-white/10 rounded-xl pl-11 pr-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500/50 transition-colors"
+                    />
+                    
+                    {/* Dropdown com os Resultados */}
+                    {showDropdown && searchResults.length > 0 && (
+                      <div className="absolute w-full mt-2 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 z-[100]">
+                        {searchResults.map((movie) => (
+                          <div 
+                            key={movie.id}
+                            className="flex items-center gap-3 p-3 hover:bg-white/5 cursor-pointer transition-colors border-b border-white/5 last:border-0"
+                            onClick={() => {
+                              setManualSearch(movie.title);
+                              setShowDropdown(false);
+                            }}
+                          >
+                            {movie.posterPath ? (
+                              <img 
+                                src={`${TMDB_IMAGE_URL}${movie.posterPath}`} 
+                                alt={movie.title} 
+                                className="w-8 h-12 object-cover rounded bg-black/50" 
+                              />
+                            ) : (
+                              <div className="w-8 h-12 bg-white/5 border border-white/10 rounded flex flex-col items-center justify-center text-[10px] text-gray-500">
+                                <Film className="w-4 h-4 mb-1 opacity-50"/>
+                                N/A
+                              </div>
+                            )}
+                            <div className="flex flex-col overflow-hidden">
+                              <span className="text-sm text-gray-200 font-medium truncate">{movie.title}</span>
+                              <span className="text-xs text-gray-500 truncate">
+                                {movie.year || 'N/A'} {movie.originalTitle && movie.originalTitle !== movie.title ? `(${movie.originalTitle})` : ''}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={!manualSearch.trim() || isSearching}
+                    className="bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 flex items-center justify-center min-w-[120px]"
+                  >
+                    Adicionar
+                  </button>
+                </form>
+              </div>
+            )}
+
             {watchedMovies.length === 0 ? (
               <div className="text-center py-16">
                 <Film className="w-10 h-10 mx-auto mb-4 text-gray-600" />
@@ -566,15 +697,17 @@ export default function TwitchMovieVoting() {
 
         {/* ── Aba Admin ── */}
         {activeTab === 'admin' && isAdmin && (
-          <div className="space-y-6 motion-safe:animate-fadeIn">
-            <div className="bg-white/[0.03] border border-emerald-500/20 rounded-xl p-5 sm:p-6 shadow-xl">
-              <h2 className="text-lg sm:text-xl font-bold text-white mb-4 border-b border-white/10 pb-3 flex items-center gap-2">
-                <span className="text-emerald-400">⚡</span> Controles de Votação
-              </h2>
-              <div className="flex flex-wrap gap-4">
+          <div className="space-y-6 motion-safe:animate-fadeIn mt-6 max-w-4xl mx-auto">
+            
+            {/* ── CONTROLES MINIMALISTAS ── */}
+            <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-6 sm:p-8">
+              
+              <div className="flex w-full flex-col sm:flex-row gap-4">
                 <button
                   disabled={isProcessingControl}
                   onClick={async () => {
+                    const nextState = !votingActive;
+                    setVotingActive(nextState); // OPTIMISTIC UI UPDATE
                     setIsProcessingControl(true);
                     try {
                       const res = await fetch(`${API_URL}/api/control`, {
@@ -583,29 +716,33 @@ export default function TwitchMovieVoting() {
                           'Content-Type': 'application/json',
                           'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
                         },
-                        body: JSON.stringify({ action: votingActive ? 'stop' : 'start' })
+                        body: JSON.stringify({ action: nextState ? 'start' : 'stop' })
                       });
-                      if (res.ok) fetchRanking();
-                      else console.error('Erro ao alterar votação. Token expirado?');
+                      if (!res.ok) {
+                        setVotingActive(!nextState); // Revert on fail
+                        console.error('Erro ao alterar votação. Token expirado?');
+                      }
                     } catch (e) {
+                      setVotingActive(!nextState); // Revert on fail
                       console.error(e);
                     } finally {
                       setIsProcessingControl(false);
                     }
                   }}
-                  className={`px-6 py-3 rounded-lg font-bold text-sm transition-all flex items-center justify-center min-w-[140px] ${
-                    isProcessingControl ? 'opacity-50 cursor-not-allowed bg-gray-500/20 text-gray-400' :
-                    votingActive 
-                      ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30 border border-red-500/30' 
-                      : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30'
+                  className={`flex-1 px-6 py-3 rounded-xl font-medium text-sm transition-all border
+                    ${isProcessingControl ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.02]'} 
+                    ${votingActive 
+                      ? 'bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20' 
+                      : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
                   }`}
                 >
-                  {isProcessingControl ? 'Aguarde...' : (votingActive ? '⏸ Pausar Votação' : '▶ Abrir Votação')}
+                  {votingActive ? 'Pausar Votação' : 'Iniciar votação'}
                 </button>
 
                 <button
                   disabled={isProcessingControl}
                   onClick={async () => {
+                    setRanking([]); setTotalVotes(0); // OPTIMISTIC UI CLEAR
                     setIsProcessingControl(true);
                     try {
                       const res = await fetch(`${API_URL}/api/control`, {
@@ -616,41 +753,49 @@ export default function TwitchMovieVoting() {
                         },
                         body: JSON.stringify({ action: 'clear' })
                       });
-                      if (res.ok) fetchRanking();
-                      else console.error('Erro ao limpar votação.');
+                      if (!res.ok) {
+                        fetchRanking(); // Revert
+                        console.error('Erro ao limpar votação.');
+                      }
                     } catch (e) {
+                      fetchRanking(); // Revert
                       console.error(e);
                     } finally {
                       setIsProcessingControl(false);
                     }
                   }}
-                  className={`px-6 py-3 rounded-lg font-bold text-sm transition-all flex items-center justify-center min-w-[140px] ${
-                    isProcessingControl ? 'opacity-50 cursor-not-allowed bg-gray-500/20 text-gray-400' :
-                    'bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 border border-orange-500/30'
-                  }`}
+                  className={`flex-1 px-6 py-3 rounded-xl font-medium text-sm transition-all border
+                    ${isProcessingControl ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.02] hover:bg-white/10'}
+                    bg-white/5 text-gray-300 border-white/10
+                  `}
                 >
-                  {isProcessingControl ? 'Aguarde...' : '🗑️ Limpar Votos'}
+                  Limpar votos
                 </button>
               </div>
             </div>
 
-            <div className="bg-white/[0.03] border border-white/5 rounded-xl p-5 sm:p-6 shadow-xl">
-              <h2 className="text-lg sm:text-xl font-bold text-white mb-4 border-b border-white/10 pb-3">
-                🏆 Top Filmes Atuais (Marcar como Assistido)
-              </h2>
+            {/* ── LISTA MINIMALISTA DE VENCEDORES ── */}
+            <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-6 sm:p-8">
+              <h3 className="text-gray-300 font-medium mb-5 text-sm">Transferir do ranking para assistidos</h3>
               {ranking.length === 0 ? (
-                <p className="text-gray-500 text-sm">A votação atual está vazia.</p>
+                <div className="text-center text-gray-600 text-sm py-8">
+                  Nenhum voto no momento.
+                </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {ranking.slice(0, 10).map((movie, index) => (
-                    <div key={movie.name} className="flex items-center justify-between bg-black/40 p-3 rounded-lg border border-white/5">
-                      <div className="flex items-center gap-3">
-                        <span className="text-gray-500 font-mono text-sm">#{index + 1}</span>
-                        <span className="text-white font-medium">{movie.name}</span>
-                        <span className="text-gray-400 text-xs">({movie.count} votos)</span>
+                    <div key={movie.name} className="flex flex-col sm:flex-row items-center justify-between bg-white/[0.01] p-3 rounded-xl hover:bg-white/[0.03] transition-colors border border-transparent hover:border-white/5 gap-4">
+                      <div className="flex items-center gap-4 w-full sm:w-auto">
+                        <span className="text-gray-600 font-mono text-xs w-4">{(index + 1)}</span>
+                        <div className="flex flex-col">
+                          <span className="text-gray-200 font-medium text-sm">{movie.name}</span>
+                          <span className="text-gray-500 text-xs mt-0.5">{movie.count} votos</span>
+                        </div>
                       </div>
                       <button
                         onClick={async () => {
+                          // Optimistic remove from ranking
+                          setRanking(prev => prev.filter(m => m.name !== movie.name));
                           try {
                             const res = await fetch(`${API_URL}/api/movies/watch`, {
                               method: 'POST',
@@ -658,21 +803,23 @@ export default function TwitchMovieVoting() {
                                 'Content-Type': 'application/json',
                                 'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
                               },
-                              body: JSON.stringify({ movieName: movie.name, markedBy: 'Streamer' })
+                              body: JSON.stringify({ movieName: movie.name, markedBy: 'Moderador' })
                             });
                             if (res.ok) {
-                              fetchRanking(); // Recarrega rank + assistidos
+                              fetchRanking(); // Refresh to get the updated watched list
                             } else {
+                              fetchRanking(); // Revert on error
                               const err = await res.json();
                               console.error(`Erro: ${err.error}`);
                             }
                           } catch (e) {
+                            fetchRanking(); // Revert on error
                             console.error(e);
                           }
                         }}
-                        className="bg-emerald-500 hover:bg-emerald-600 text-white text-xs px-3 py-1.5 rounded-md font-bold transition-colors"
+                        className="w-full sm:w-auto bg-transparent border border-gray-700 text-gray-400 hover:text-white hover:border-white text-xs px-4 py-2 rounded-lg transition-colors"
                       >
-                        ✓ Marcar Visto
+                        Marcar como visto
                       </button>
                     </div>
                   ))}
