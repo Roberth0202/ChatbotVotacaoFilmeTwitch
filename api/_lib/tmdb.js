@@ -119,6 +119,7 @@ async function searchMovies(query) {
         id: movie.id,
         title: movie.title,
         originalTitle: movie.original_title,
+        description: movie.overview || null,
         posterPath: movie.poster_path,
         year: movie.release_date ? movie.release_date.split('-')[0] : null,
       }));
