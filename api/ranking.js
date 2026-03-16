@@ -56,8 +56,10 @@ module.exports = async function handler(req, res) {
 
     const watchedMovies = await db.collection('watched').find({}).sort({ markedAt: -1 }).toArray();
 
-    // Remove _id do MongoDB antes de enviar
-    const cleanWatched = watchedMovies.map(({ _id, ...rest }) => rest);
+    const cleanWatched = watchedMovies.map(({ _id, ...rest }) => ({
+      id: _id.toString(),
+      ...rest
+    }));
 
     return res.status(200).json({
       ranking,

@@ -530,7 +530,11 @@ export default function TwitchMovieVoting() {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
                       },
-                      body: JSON.stringify({ movieName: manualSearch.trim(), markedBy: 'Moderador' })
+                      body: JSON.stringify({ 
+                        movieName: manualSearch.trim(), 
+                        markedBy: 'Moderador',
+                        tmdbData: searchResults.find(m => m.title.toLowerCase() === manualSearch.trim().toLowerCase()) || null
+                      })
                     });
                     if (res.ok) {
                       setManualSearch('');
@@ -575,9 +579,33 @@ export default function TwitchMovieVoting() {
                           <div 
                             key={movie.id}
                             className="flex items-center gap-3 p-3 hover:bg-white/5 cursor-pointer transition-colors border-b border-white/5 last:border-0"
-                            onClick={() => {
+                            onClick={async () => {
                               setManualSearch(movie.title);
                               setShowDropdown(false);
+                              try {
+                                const res = await fetch(`${API_URL}/api/movies/watch`, {
+                                  method: 'POST',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+                                  },
+                                  body: JSON.stringify({ 
+                                    movieName: movie.title, 
+                                    markedBy: 'Moderador',
+                                    tmdbData: movie
+                                  })
+                                });
+                                if (res.ok) {
+                                  setManualSearch('');
+                                  setSearchResults([]);
+                                  fetchRanking();
+                                } else {
+                                  const err = await res.json();
+                                  alert(`Erro: ${err.error}`);
+                                }
+                              } catch (e) {
+                                console.error('Erro ao adicionar via dropdown', e);
+                              }
                             }}
                           >
                             {movie.posterPath ? (
@@ -632,7 +660,7 @@ export default function TwitchMovieVoting() {
                         {movie.posterPath ? (
                           <img
                             src={`${TMDB_IMAGE_URL}${movie.posterPath}`}
-                            alt={movie.title}
+                            alt={movie.title || movie.name}
                             className="w-16 h-24 sm:w-20 sm:h-30 rounded-lg object-cover shrink-0"
                           />
                         ) : (
@@ -643,13 +671,40 @@ export default function TwitchMovieVoting() {
 
                         {/* Info */}
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-start gap-2 mb-1">
-                            <h3 className="text-sm sm:text-lg font-bold text-white leading-tight truncate">
-                              {movie.title}
-                            </h3>
-                            <span className="shrink-0 bg-violet-500/20 text-violet-300 text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded border border-violet-500/30">
-                              ✓ VISTO
-                            </span>
+                          <div className="flex items-start justify-between gap-2 mb-1">
+                            <div className="flex items-start gap-2 overflow-hidden">
+                              <h3 className="text-sm sm:text-lg font-bold text-white leading-tight truncate">
+                                {movie.title || movie.name}
+                              </h3>
+                              <span className="shrink-0 bg-violet-500/20 text-violet-300 text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded border border-violet-500/30">
+                                ✓ VISTO
+                              </span>
+                            </div>
+                            {isAdmin && (
+                              <button
+                                onClick={async () => {
+                                  if (!window.confirm(`Deseja remover ${movie.title || movie.name} dos assistidos?`)) return;
+                                  try {
+                                    const res = await fetch(`${API_URL}/api/movies/watch?id=${movie.id}`, {
+                                      method: 'DELETE',
+                                      headers: {
+                                        'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+                                      }
+                                    });
+                                    if (res.ok) {
+                                      fetchRanking();
+                                    } else {
+                                      alert('Erro ao remover.');
+                                    }
+                                  } catch (e) {
+                                    alert('Erro de conexão ao remover.');
+                                  }
+                                }}
+                                className="shrink-0 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-[10px] sm:text-xs font-medium px-2 py-1 rounded border border-red-500/20 transition-colors"
+                              >
+                                Remover
+                              </button>
+                            )}
                           </div>
 
                           <div className="flex flex-wrap items-center gap-2 mb-2 text-[10px] sm:text-xs text-gray-400">

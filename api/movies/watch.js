@@ -12,21 +12,25 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const { db } = await connectToDatabase();
-    const watchedCollection = db.collection('watched_movies');
+      const { db } = await connectToDatabase();
+    const watchedCollection = db.collection('watched');
     const votesCollection = db.collection('votes');
 
     // GET: Retornar lista de filmes assistidos
     if (req.method === 'GET') {
       const watched = await watchedCollection.find({}).sort({ watchedAt: -1 }).toArray();
-      return res.status(200).json(watched);
+      const cleanWatched = watched.map(({ _id, ...rest }) => ({
+        id: _id.toString(),
+        ...rest
+      }));
+      return res.status(200).json(cleanWatched);
     }
 
     // POST: Marcar filme como assistido (Apenas Admin)
     if (req.method === 'POST') {
       if (!requireAdmin(req, res)) return; // Se falhar, requireAdmin já envia a resposta 401/403
 
-      const { movieName, markedBy } = req.body;
+      const { movieName, markedBy, tmdbData } = req.body;
       if (!movieName) {
         return res.status(400).json({ error: 'movieName is required.' });
       }
@@ -34,7 +38,15 @@ module.exports = async function handler(req, res) {
       // 1. Inserir na coleção de assistidos
       await watchedCollection.insertOne({
         name: movieName,
+        title: tmdbData?.title || movieName,
+        posterPath: tmdbData?.posterPath || null,
+        year: tmdbData?.year || null,
+        certification: tmdbData?.certification || null,
+        overview: tmdbData?.overview || null,
+        voteAverage: tmdbData?.voteAverage || null,
+        tmdbId: tmdbData?.id || null,
         watchedAt: new Date(),
+        markedAt: new Date(), // Manter compatibilidade com ranking api
         markedBy: markedBy || 'Admin'
       });
 
@@ -42,6 +54,20 @@ module.exports = async function handler(req, res) {
       await votesCollection.deleteMany({ movieName: movieName });
 
       return res.status(200).json({ success: true, message: `${movieName} marked as watched and votes cleared.` });
+    }
+
+    // DELETE: Remover filme (Apenas Admin)
+    if (req.method === 'DELETE') {
+      if (!requireAdmin(req, res)) return;
+
+      const { id } = req.query;
+      if (!id) {
+        return res.status(400).json({ error: 'id is required' });
+      }
+
+      const { ObjectId } = require('mongodb');
+      await watchedCollection.deleteOne({ _id: new ObjectId(id) });
+      return res.status(200).json({ success: true, message: 'Movie removed from watched list.' });
     }
 
     // Método não permitido
