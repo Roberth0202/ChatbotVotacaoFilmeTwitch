@@ -317,7 +317,7 @@ export default function TwitchMovieVoting() {
             className={`flex-1 py-2 rounded-md font-medium text-sm transition-all outline-none focus:outline-none focus:ring-0 border ${
               activeTab === 'votacao'
                 ? 'bg-violet-500/20 text-violet-300 border-violet-500/30'
-                : 'text-gray-500 hover:text-gray-300 hover:bg-white/5 border-transparent'
+                : 'text-gray-500 hover:text-gray-300 border-transparent'
             }`}
           >
             Votação {ranking.length > 0 && `(${ranking.length})`}
