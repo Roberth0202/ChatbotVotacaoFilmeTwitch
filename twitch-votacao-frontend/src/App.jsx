@@ -314,20 +314,20 @@ export default function TwitchMovieVoting() {
         <div className="flex gap-1 mb-6 bg-white/5 p-1 rounded-lg">
           <button
             onClick={() => setActiveTab('votacao')}
-            className={`flex-1 py-2 rounded-md font-medium text-sm transition-all ${
+            className={`flex-1 py-2 rounded-md font-medium text-sm transition-all outline-none focus:outline-none focus:ring-0 border ${
               activeTab === 'votacao'
-                ? 'bg-violet-500/20 text-violet-300'
-                : 'text-gray-500 hover:text-gray-300'
+                ? 'bg-violet-500/20 text-violet-300 border-violet-500/30'
+                : 'text-gray-500 hover:text-gray-300 hover:bg-white/5 border-transparent'
             }`}
           >
             Votação {ranking.length > 0 && `(${ranking.length})`}
           </button>
           <button
             onClick={() => setActiveTab('assistidos')}
-            className={`flex-1 py-2 rounded-md font-medium text-sm transition-all ${
+            className={`flex-1 py-2 rounded-md font-medium text-sm transition-all outline-none focus:outline-none focus:ring-0 border ${
               activeTab === 'assistidos'
-                ? 'bg-violet-500/20 text-violet-300'
-                : 'text-gray-500 hover:text-gray-300'
+                ? 'bg-violet-500/20 text-violet-300 border-violet-500/30'
+                : 'text-gray-500 hover:text-gray-300 hover:bg-white/5 border-transparent'
             }`}
           >
             Assistidos {watchedMovies.length > 0 && `(${watchedMovies.length})`}
@@ -335,10 +335,10 @@ export default function TwitchMovieVoting() {
           {isAdmin && (
             <button
               onClick={() => setActiveTab('admin')}
-              className={`flex-1 py-2 rounded-md font-medium text-sm transition-all flex items-center justify-center gap-1.5 ${
+              className={`flex-1 py-2 rounded-md font-medium text-sm transition-all flex items-center justify-center gap-1.5 outline-none focus:outline-none focus:ring-0 border ${
                 activeTab === 'admin'
-                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                  : 'text-gray-500 hover:text-emerald-400/70 border border-transparent'
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                  : 'text-gray-500 hover:text-emerald-400/70 hover:bg-white/5 border-transparent'
               }`}
             >
               🔒 Painel Admin
