@@ -229,7 +229,7 @@ export default function TwitchMovieVoting() {
   }, [lastVoteEvent]);
 
   return (
-    <div className="min-h-screen bg-[#0d0b1a] text-white font-sans">
+    <div className="min-h-screen bg-[#0d0b1a] text-white font-sans overflow-x-hidden">
 
       {/* ── Header ── */}
       <header className="border-b border-white/5">
@@ -277,7 +277,7 @@ export default function TwitchMovieVoting() {
         </div>
       </header>
 
-      <main className="container mx-auto px-3 sm:px-6 lg:px-8 pb-8 sm:pb-12">
+      <main className="container mx-auto px-3 sm:px-6 lg:px-8 pb-8 sm:pb-12 overflow-x-hidden">
 
         {/* ── Legenda de Faixas Etárias ── */}
         <div className="-mx-3 sm:-mx-6 lg:-mx-8 bg-white/5 backdrop-blur-xl rounded-xl sm:rounded-2xl p-4 px-5 sm:p-5 sm:px-8 lg:px-12 border border-white/10 mb-4 sm:mb-6">
