@@ -280,7 +280,7 @@ export default function TwitchMovieVoting() {
       <main className="container mx-auto px-3 sm:px-6 lg:px-8 pb-8 sm:pb-12 overflow-x-hidden">
 
         {/* ── Legenda de Faixas Etárias ── */}
-        <div className="-mx-3 sm:-mx-6 lg:-mx-8 bg-white/5 backdrop-blur-xl rounded-xl sm:rounded-2xl p-4 px-5 sm:p-5 sm:px-8 lg:px-12 border border-white/10 mb-4 sm:mb-6">
+        <div className="-mx-3 sm:-mx-6 lg:-mx-8 bg-white/5  rounded-xl sm:rounded-2xl p-4 px-5 sm:p-5 sm:px-8 lg:px-12 border border-white/10 mb-4 sm:mb-6">
           <h3 className="text-xs sm:text-sm font-semibold text-gray-300 mb-3 text-center">📋 Classificação Indicativa</h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
             <div className="flex items-start gap-2 bg-green-500/10 rounded-lg p-2">
