@@ -311,7 +311,7 @@ export default function TwitchMovieVoting() {
         </div>
 
         {/* ── Abas ── */}
-        <div className="flex gap-1 mb-6 bg-white/5 p-1 rounded-lg">
+        <div className="flex gap-1 mb-6 bg-white/[0.04] p-1 rounded-xl border border-white/[0.06]">
           <button
             onClick={() => setActiveTab('votacao')}
             className={`flex-1 py-2 rounded-md font-medium text-sm transition-all outline-none focus:outline-none focus:ring-0 border ${
