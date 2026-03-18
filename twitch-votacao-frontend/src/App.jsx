@@ -566,7 +566,7 @@ export default function TwitchMovieVoting() {
                         setManualSearch(e.target.value);
                         setShowDropdown(true);
                       }}
-                      onFocus={() => { if (searchResults.length > 0) setShowDropdown(true); }}
+                      onFocus={() => { if (searchResults.length > 0 && manualSearch.trim().length >= 2) setShowDropdown(true); }}
                       onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
                       placeholder="Busque por um filme..."
                       className="w-full bg-black/40 border border-white/10 rounded-xl pl-11 pr-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500/50 transition-colors"
