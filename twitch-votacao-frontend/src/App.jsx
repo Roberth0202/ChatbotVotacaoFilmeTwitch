@@ -4,7 +4,7 @@ import { useTwitchChat } from './hooks/useTwitchChat';
 
 const API_URL = process.env.REACT_APP_API_URL || '';
 const TMDB_IMAGE_URL = 'https://image.tmdb.org/t/p/w500';
-const POLLING_INTERVAL = 10000; // Afrouxado para 10s pois agora usamos WebSocket
+const POLLING_INTERVAL = 2000; // Afrouxado para 10s pois agora usamos WebSocket
 const TWITCH_CHANNEL = process.env.REACT_APP_TWITCH_CHANNEL || 'roberth0202';
 
 const getCertificationStyle = (cert) => {
