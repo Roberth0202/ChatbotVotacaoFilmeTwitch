@@ -35,6 +35,7 @@ export default function TwitchMovieVoting() {
   const [activeTab, setActiveTab] = useState('votacao'); // 'votacao', 'assistidos', 'admin'
   const [isAdmin, setIsAdmin] = useState(() => !!localStorage.getItem('adminToken'));
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isProcessingControl, setIsProcessingControl] = useState(false);
   const [manualSearch, setManualSearch] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
