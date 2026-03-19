@@ -4,7 +4,7 @@ import { useTwitchChat } from './hooks/useTwitchChat';
 
 const API_URL = process.env.REACT_APP_API_URL || '';
 const TMDB_IMAGE_URL = 'https://image.tmdb.org/t/p/w500';
-const POLLING_INTERVAL = 2000; // Afrouxado para 10s pois agora usamos WebSocket
+const POLLING_INTERVAL = 10000; // Backup do WebSocket — fetch sob demanda cuida de filmes novos
 const TWITCH_CHANNEL = process.env.REACT_APP_TWITCH_CHANNEL || 'roberth0202';
 
 const getCertificationStyle = (cert) => {
@@ -35,7 +35,6 @@ export default function TwitchMovieVoting() {
   const [activeTab, setActiveTab] = useState('votacao'); // 'votacao', 'assistidos', 'admin'
   const [isAdmin, setIsAdmin] = useState(() => !!localStorage.getItem('adminToken'));
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [isProcessingControl, setIsProcessingControl] = useState(false);
   const [manualSearch, setManualSearch] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -201,7 +200,7 @@ export default function TwitchMovieVoting() {
       return prev + 1;
     });
     
-    // Incrementa graficamente local
+    // Incrementa graficamente local ou busca dados do filme novo
     setRanking(prev => {
       const exists = prev.find(m => m.name.toLowerCase() === movieName.toLowerCase());
       if (exists) {
@@ -211,7 +210,9 @@ export default function TwitchMovieVoting() {
             : m
         ).sort((a, b) => b.count - a.count);
       }
-      return prev; // Se o filme for novo, não tem poster localmente. O Polling de 10s buscará isso em breve.
+      // Filme novo: fetch imediato para trazer dados TMDB (poster, ano, etc.)
+      fetchRanking();
+      return prev;
     });
 
     // 2. Somente o navegador que tem a autorização salva os votos no MongoDB
@@ -759,11 +760,9 @@ export default function TwitchMovieVoting() {
               
               <div className="flex w-full flex-col sm:flex-row gap-4">
                 <button
-                  disabled={isProcessingControl}
                   onClick={async () => {
                     const nextState = !votingActive;
-                    setVotingActive(nextState); // OPTIMISTIC UI UPDATE
-                    setIsProcessingControl(true);
+                    setVotingActive(nextState); // OPTIMISTIC UI UPDATE instantâneo
                     try {
                       const res = await fetch(`${API_URL}/api/control`, {
                         method: 'POST',
@@ -778,14 +777,13 @@ export default function TwitchMovieVoting() {
                         console.error('Erro ao alterar votação. Token expirado?');
                       }
                     } catch (e) {
-                      setVotingActive(!nextState); // Revert on fail
-                      console.error(e);
-                    } finally {
-                      setIsProcessingControl(false);
+                      if (e.name !== 'AbortError') {
+                        setVotingActive(!nextState); // Revert on fail
+                        console.error(e);
+                      }
                     }
                   }}
-                  className={`flex-1 px-6 py-3 rounded-xl font-medium text-sm transition-all border
-                    ${isProcessingControl ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.02]'} 
+                  className={`flex-1 px-6 py-3 rounded-xl font-medium text-sm transition-all border hover:scale-[1.02] active:scale-[0.98]
                     ${votingActive 
                       ? 'bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20' 
                       : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
