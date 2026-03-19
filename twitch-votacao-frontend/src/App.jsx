@@ -228,7 +228,7 @@ export default function TwitchMovieVoting() {
         body: JSON.stringify({ username, movieName })
       }).catch(err => console.error('Erro ao enviar voto pro BD:', err));
     }
-  }, [lastVoteEvent]);
+  }, [lastVoteEvent, fetchRanking]);
 
   return (
     <div className="min-h-screen bg-[#0d0b1a] text-white font-sans overflow-x-hidden">
