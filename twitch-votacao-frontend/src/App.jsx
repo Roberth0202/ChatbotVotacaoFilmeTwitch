@@ -857,7 +857,7 @@ export default function TwitchMovieVoting() {
                                 'Content-Type': 'application/json',
                                 'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
                               },
-                              body: JSON.stringify({ movieName: movie.name, markedBy: 'Moderador' })
+                              body: JSON.stringify({ movieName: movie.name, markedBy: 'Moderador', tmdbData: movie })
                             });
                             if (res.ok) {
                               fetchRanking(); // Refresh to get the updated watched list
