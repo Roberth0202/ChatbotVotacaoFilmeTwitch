@@ -634,7 +634,7 @@ export default function TwitchMovieVoting() {
                               </span>
                             </div>
                             {alreadyWatched && (
-                              <span className="shrink-0 bg-violet-500/20 text-violet-300 text-[9px] font-bold px-1.5 py-0.5 rounded border border-violet-500/30">
+                              <span className="shrink-0 bg-emerald-500/20 text-emerald-300 text-[9px] font-bold px-1.5 py-0.5 rounded border border-emerald-500/30">
                                 ✓ VISTO
                               </span>
                             )}
