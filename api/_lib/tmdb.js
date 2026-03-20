@@ -115,14 +115,42 @@ async function searchMovies(query) {
 
     const data = await response.json();
     if (data.results && data.results.length > 0) {
-      const results = data.results.slice(0, 5).map(movie => ({
-        id: movie.id,
-        title: movie.title,
-        originalTitle: movie.original_title,
-        description: movie.overview || null,
-        posterPath: movie.poster_path,
-        year: movie.release_date ? movie.release_date.split('-')[0] : null,
-      }));
+      // Buscar certification para cada filme dos top 5
+      const results = await Promise.all(
+        data.results.slice(0, 5).map(async (movie) => {
+          let certification = null;
+          try {
+            const certUrl = `${TMDB_BASE_URL}/movie/${movie.id}/release_dates`;
+            const certResponse = await fetch(certUrl, { headers: getTmdbHeaders() });
+            if (certResponse.ok) {
+              const certData = await certResponse.json();
+              const brRelease = certData.results?.find(r => r.iso_3166_1 === 'BR');
+              if (brRelease && brRelease.release_dates?.length > 0) {
+                certification = brRelease.release_dates[0].certification || null;
+              }
+              if (!certification) {
+                const usRelease = certData.results?.find(r => r.iso_3166_1 === 'US');
+                if (usRelease && usRelease.release_dates?.length > 0) {
+                  certification = usRelease.release_dates[0].certification || null;
+                }
+              }
+            }
+          } catch (e) {
+            // Ignora erro de certification, não é crítico
+          }
+
+          return {
+            id: movie.id,
+            title: movie.title,
+            originalTitle: movie.original_title,
+            posterPath: movie.poster_path,
+            year: movie.release_date ? movie.release_date.split('-')[0] : null,
+            overview: movie.overview || null,
+            voteAverage: movie.vote_average || null,
+            certification
+          };
+        })
+      );
       return { results };
     }
     return { results: [] };
