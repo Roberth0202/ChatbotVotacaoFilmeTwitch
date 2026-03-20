@@ -577,11 +577,16 @@ export default function TwitchMovieVoting() {
                     {/* Dropdown com os Resultados */}
                     {showDropdown && searchResults.length > 0 && (
                       <div className="absolute w-full mt-2 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 z-[100]">
-                        {searchResults.map((movie) => (
+                        {searchResults.map((movie) => {
+                          const alreadyWatched = watchedMovies.some(w => (w.title || w.name || '').toLowerCase() === movie.title.toLowerCase());
+                          return (
                           <div 
                             key={movie.id}
-                            className="flex items-center gap-3 p-3 hover:bg-white/5 cursor-pointer transition-colors border-b border-white/5 last:border-0"
+                            className={`flex items-center gap-3 p-3 transition-colors border-b border-white/5 last:border-0 ${
+                              alreadyWatched ? 'opacity-50 cursor-default' : 'hover:bg-white/5 cursor-pointer'
+                            }`}
                             onClick={async () => {
+                              if (alreadyWatched) return;
                               setManualSearch(movie.title);
                               setShowDropdown(false);
                               try {
@@ -622,14 +627,20 @@ export default function TwitchMovieVoting() {
                                 N/A
                               </div>
                             )}
-                            <div className="flex flex-col overflow-hidden">
+                            <div className="flex flex-col overflow-hidden flex-1">
                               <span className="text-sm text-gray-200 font-medium truncate">{movie.title}</span>
                               <span className="text-xs text-gray-500 truncate">
                                 {movie.year || 'N/A'} {movie.originalTitle && movie.originalTitle !== movie.title ? `(${movie.originalTitle})` : ''}
                               </span>
                             </div>
+                            {alreadyWatched && (
+                              <span className="shrink-0 bg-violet-500/20 text-violet-300 text-[9px] font-bold px-1.5 py-0.5 rounded border border-violet-500/30">
+                                ✓ VISTO
+                              </span>
+                            )}
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -686,6 +697,8 @@ export default function TwitchMovieVoting() {
                               <button
                                 onClick={async () => {
                                   if (!window.confirm(`Deseja remover ${movie.title || movie.name} dos assistidos?`)) return;
+                                  // Optimistic UI: remove imediatamente da lista
+                                  setWatchedMovies(prev => prev.filter(m => m.id !== movie.id));
                                   try {
                                     const res = await fetch(`${API_URL}/api/movies/watch?id=${movie.id}`, {
                                       method: 'DELETE',
@@ -693,12 +706,13 @@ export default function TwitchMovieVoting() {
                                         'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
                                       }
                                     });
-                                    if (res.ok) {
-                                      fetchRanking();
-                                    } else {
+                                    if (!res.ok) {
+                                      // Revert: adiciona de volta se falhar
+                                      setWatchedMovies(prev => [...prev, movie].sort((a, b) => new Date(b.markedAt) - new Date(a.markedAt)));
                                       alert('Erro ao remover.');
                                     }
                                   } catch (e) {
+                                    setWatchedMovies(prev => [...prev, movie].sort((a, b) => new Date(b.markedAt) - new Date(a.markedAt)));
                                     alert('Erro de conexão ao remover.');
                                   }
                                 }}
@@ -837,7 +851,9 @@ export default function TwitchMovieVoting() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {ranking.slice(0, 10).map((movie, index) => (
+                  {ranking.slice(0, 10).map((movie, index) => {
+                    const alreadyWatched = watchedMovies.some(w => (w.title || w.name || '').toLowerCase() === movie.name.toLowerCase());
+                    return (
                     <div key={movie.name} className="flex flex-col sm:flex-row items-center justify-between bg-white/[0.01] p-3 rounded-xl hover:bg-white/[0.03] transition-colors border border-transparent hover:border-white/5 gap-4">
                       <div className="flex items-center gap-4 w-full sm:w-auto">
                         <span className="text-gray-600 font-mono text-xs w-4">{(index + 1)}</span>
@@ -847,6 +863,7 @@ export default function TwitchMovieVoting() {
                         </div>
                       </div>
                       <button
+                        disabled={alreadyWatched}
                         onClick={async () => {
                           // Optimistic remove from ranking
                           setRanking(prev => prev.filter(m => m.name !== movie.name));
@@ -860,23 +877,28 @@ export default function TwitchMovieVoting() {
                               body: JSON.stringify({ movieName: movie.name, markedBy: 'Moderador', tmdbData: movie })
                             });
                             if (res.ok) {
-                              fetchRanking(); // Refresh to get the updated watched list
+                              fetchRanking();
                             } else {
-                              fetchRanking(); // Revert on error
+                              fetchRanking();
                               const err = await res.json();
-                              console.error(`Erro: ${err.error}`);
+                              alert(err.error || 'Erro ao transferir.');
                             }
                           } catch (e) {
-                            fetchRanking(); // Revert on error
+                            fetchRanking();
                             console.error(e);
                           }
                         }}
-                        className="w-full sm:w-auto bg-transparent border border-gray-700 text-gray-400 hover:text-white hover:border-white text-xs px-4 py-2 rounded-lg transition-colors"
+                        className={`w-full sm:w-auto text-xs px-4 py-2 rounded-lg transition-colors border ${
+                          alreadyWatched 
+                            ? 'border-gray-800 text-gray-600 cursor-not-allowed' 
+                            : 'border-gray-700 text-gray-400 hover:text-white hover:border-white bg-transparent'
+                        }`}
                       >
-                        Marcar como visto
+                        {alreadyWatched ? 'Já assistido' : 'Marcar como visto'}
                       </button>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

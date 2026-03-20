@@ -35,6 +35,14 @@ module.exports = async function handler(req, res) {
         return res.status(400).json({ error: 'movieName is required.' });
       }
 
+      // Verificar duplicata (case-insensitive)
+      const existing = await watchedCollection.findOne({ 
+        name: { $regex: new RegExp(`^${movieName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+      });
+      if (existing) {
+        return res.status(409).json({ error: `"${movieName}" já está na lista de assistidos.` });
+      }
+
       // 1. Inserir na coleção de assistidos
       await watchedCollection.insertOne({
         name: movieName,
