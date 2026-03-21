@@ -7,6 +7,14 @@ const TMDB_IMAGE_URL = 'https://image.tmdb.org/t/p/w500';
 const POLLING_INTERVAL = 10000; // Backup do WebSocket — fetch sob demanda cuida de filmes novos
 const TWITCH_CHANNEL = process.env.REACT_APP_TWITCH_CHANNEL || 'roberth0202';
 
+const TMDB_GENRES = {
+  28: 'Ação', 12: 'Aventura', 16: 'Animação', 35: 'Comédia', 80: 'Crime',
+  99: 'Documentário', 18: 'Drama', 10751: 'Família', 14: 'Fantasia',
+  36: 'História', 27: 'Terror', 10402: 'Música', 9648: 'Mistério',
+  10749: 'Romance', 878: 'Ficção científica', 10770: 'Cinema TV',
+  53: 'Thriller', 10752: 'Guerra', 37: 'Faroeste'
+};
+
 const getCertificationStyle = (cert) => {
   if (!cert) return { bg: 'bg-gray-600', text: 'N/A' };
   const c = cert.toUpperCase();
@@ -40,6 +48,7 @@ export default function TwitchMovieVoting() {
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [selectedGenre, setSelectedGenre] = useState(null);
 
   // Hook da Twitch para WebSockets
   const { chatConnected, lastVoteEvent } = useTwitchChat(TWITCH_CHANNEL);
@@ -380,6 +389,41 @@ export default function TwitchMovieVoting() {
           </div>
         )}
 
+        {/* ── Filtro de Gênero ── */}
+        {ranking.length > 0 && (() => {
+          const availableGenres = [...new Set(ranking.flatMap(m => m.genreIds || []))]
+            .filter(id => TMDB_GENRES[id])
+            .sort((a, b) => TMDB_GENRES[a].localeCompare(TMDB_GENRES[b]));
+          if (availableGenres.length === 0) return null;
+          return (
+            <div className="mb-4 flex flex-wrap gap-1.5 sm:gap-2">
+              <button
+                onClick={() => setSelectedGenre(null)}
+                className={`text-[10px] sm:text-xs px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full font-medium transition-all border ${
+                  selectedGenre === null
+                    ? 'bg-violet-500/20 text-violet-300 border-violet-500/40'
+                    : 'bg-white/[0.03] text-gray-500 border-white/10 hover:text-gray-300 hover:border-white/20'
+                }`}
+              >
+                Todos
+              </button>
+              {availableGenres.map(id => (
+                <button
+                  key={id}
+                  onClick={() => setSelectedGenre(selectedGenre === id ? null : id)}
+                  className={`text-[10px] sm:text-xs px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full font-medium transition-all border ${
+                    selectedGenre === id
+                      ? 'bg-violet-500/20 text-violet-300 border-violet-500/40'
+                      : 'bg-white/[0.03] text-gray-500 border-white/10 hover:text-gray-300 hover:border-white/20'
+                  }`}
+                >
+                  {TMDB_GENRES[id]}
+                </button>
+              ))}
+            </div>
+          );
+        })()}
+
         {/* ── Ranking de Filmes ── */}
         {ranking.length === 0 ? (
           <div className="text-center py-16 sm:py-24">
@@ -388,7 +432,7 @@ export default function TwitchMovieVoting() {
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3">
-            {ranking.map((movie, index) => {
+            {ranking.filter(m => !selectedGenre || (m.genreIds || []).includes(selectedGenre)).map((movie, index) => {
               const certStyle = getCertificationStyle(movie.certification);
               const percentage = totalVotes > 0 ? ((movie.count / totalVotes) * 100).toFixed(1) : 0;
               const isWatched = watchedMovies.some(w => w.title.toLowerCase() === movie.name.toLowerCase());
@@ -840,6 +884,32 @@ export default function TwitchMovieVoting() {
                   Limpar votos
                 </button>
               </div>
+
+              {/* Botão de migração de gêneros */}
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await fetch(`${API_URL}/api/migrate-genres`, {
+                      method: 'POST',
+                      headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+                      }
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                      alert(`✅ ${data.message} (${data.updated} votos atualizados)`);
+                      fetchRanking();
+                    } else {
+                      alert(`Erro: ${data.error}`);
+                    }
+                  } catch (e) {
+                    alert('Erro de conexão.');
+                  }
+                }}
+                className="w-full mt-3 px-4 py-2 rounded-xl text-xs font-medium transition-all border bg-white/[0.03] text-gray-500 border-white/10 hover:text-gray-300 hover:border-white/20 hover:bg-white/5"
+              >
+                🔄 Atualizar Gêneros dos Votos
+              </button>
             </div>
 
             {/* ── LISTA MINIMALISTA DE VENCEDORES ── */}

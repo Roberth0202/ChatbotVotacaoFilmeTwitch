@@ -71,6 +71,7 @@ module.exports = async function handler(req, res) {
           overview: validation.overview,
           voteAverage: validation.voteAverage,
           certification: validation.certification,
+          genreIds: validation.genreIds || [],
           votedAt: new Date().toISOString()
         }
       },

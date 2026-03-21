@@ -68,6 +68,7 @@ async function validateMovie(movieName) {
         year: movie.release_date ? movie.release_date.split('-')[0] : null,
         overview: movie.overview || null,
         voteAverage: movie.vote_average || null,
+        genreIds: movie.genre_ids || [],
         certification
       };
 

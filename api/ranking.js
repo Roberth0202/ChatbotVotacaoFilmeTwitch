@@ -31,7 +31,8 @@ module.exports = async function handler(req, res) {
           year: { $first: "$year" },
           overview: { $first: "$overview" },
           voteAverage: { $first: "$voteAverage" },
-          certification: { $first: "$certification" }
+          certification: { $first: "$certification" },
+          genreIds: { $first: "$genreIds" }
         }
       },
       {
@@ -51,7 +52,8 @@ module.exports = async function handler(req, res) {
       year: data.year,
       overview: data.overview,
       voteAverage: data.voteAverage,
-      certification: data.certification
+      certification: data.certification,
+      genreIds: data.genreIds || []
     }));
 
     const watchedMovies = await db.collection('watched').find({}).sort({ markedAt: -1 }).toArray();
