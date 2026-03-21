@@ -56,6 +56,40 @@ module.exports = async function handler(req, res) {
       genreIds: data.genreIds || []
     }));
 
+    // Auto-enriquecer votos sem gêneros (awaita para incluir na resposta atual)
+    const moviesWithoutGenres = ranking.filter(m => !m.genreIds || m.genreIds.length === 0);
+    if (moviesWithoutGenres.length > 0 && process.env.TMDB_API_KEY) {
+      const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
+      const headers = {
+        'Authorization': `Bearer ${process.env.TMDB_API_KEY}`,
+        'Content-Type': 'application/json'
+      };
+
+      await Promise.all(moviesWithoutGenres.map(async (movie) => {
+        try {
+          const searchUrl = `${TMDB_BASE_URL}/search/movie?query=${encodeURIComponent(movie.name)}&language=pt-BR`;
+          const resp = await fetch(searchUrl, { headers });
+          if (resp.ok) {
+            const data = await resp.json();
+            if (data.results && data.results.length > 0) {
+              const genreIds = data.results[0].genre_ids || [];
+              if (genreIds.length > 0) {
+                // Atualiza o objeto em memória APENAS para a resposta imediata
+                movie.genreIds = genreIds;
+                // Salva no banco em background (sem await) para acelerar a request
+                db.collection('votes').updateMany(
+                  { movie: movie.name },
+                  { $set: { genreIds } }
+                ).catch(() => {});
+              }
+            }
+          }
+        } catch (e) {
+          // Fallback silencioso
+        }
+      }));
+    }
+
     const watchedMovies = await db.collection('watched').find({}).sort({ markedAt: -1 }).toArray();
 
     const cleanWatched = watchedMovies.map(({ _id, ...rest }) => ({

@@ -49,7 +49,32 @@ export default function TwitchMovieVoting() {
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedGenre, setSelectedGenre] = useState(null);
+  const [activeFilterGenre, setActiveFilterGenre] = useState(null);
+  const [isMigrating, setIsMigrating] = useState(false);
 
+  const handleMigrateGenres = async () => {
+    setActiveFilterGenre(selectedGenre);
+    try {
+      setIsMigrating(true);
+      const res = await fetch(`${API_URL}/api/migrate-genres`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        console.log(`✅ ${data.message} (${data.updated} votos atualizados)`);
+        fetchRanking();
+      } else {
+        console.error(`Erro ao atualizar gêneros: ${data.error}`);
+      }
+    } catch (e) {
+      console.error('Erro de conexão ao tentar atualizar gêneros.', e);
+    } finally {
+      setIsMigrating(false);
+    }
+  };
   // Hook da Twitch para WebSockets
   const { chatConnected, lastVoteEvent } = useTwitchChat(TWITCH_CHANNEL);
 
@@ -220,9 +245,18 @@ export default function TwitchMovieVoting() {
             : m
         ).sort((a, b) => b.count - a.count);
       }
-      // Filme novo: fetch imediato para trazer dados TMDB (poster, ano, etc.)
-      fetchRanking();
-      return prev;
+      
+      // Filme novo: fetch com delay para dar tempo do backend (Node ou Vercel) buscar a API do TMDB e salvar
+      setTimeout(() => fetchRanking(), 2000);
+      
+      // Insere ele temporariamente para aparecer visualmente
+      return [...prev, {
+        name: movieName,
+        count: 1,
+        voters: [username],
+        genreIds: [], // Sem lista inicialmente
+        isNewLocally: true // Flag exclusiva para ele furar o filtro enquanto carrega
+      }].sort((a, b) => b.count - a.count);
     });
 
     // 2. Somente o navegador que tem a autorização salva os votos no MongoDB
@@ -390,39 +424,42 @@ export default function TwitchMovieVoting() {
         )}
 
         {/* ── Filtro de Gênero ── */}
-        {ranking.length > 0 && (() => {
-          const availableGenres = [...new Set(ranking.flatMap(m => m.genreIds || []))]
-            .filter(id => TMDB_GENRES[id])
-            .sort((a, b) => TMDB_GENRES[a].localeCompare(TMDB_GENRES[b]));
-          if (availableGenres.length === 0) return null;
-          return (
-            <div className="mb-4 flex flex-wrap gap-1.5 sm:gap-2">
+        <div className="mb-4 flex items-center gap-2">
+          <select
+            value={selectedGenre || ''}
+            onChange={(e) => setSelectedGenre(e.target.value ? Number(e.target.value) : null)}
+            className="bg-violet-500/15 text-white text-[11px] sm:text-xs border border-violet-500/30 rounded-lg px-2.5 py-1.5 outline-none focus:border-violet-500/60 transition-colors cursor-pointer appearance-none max-w-[180px]"
+            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23a78bfa' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', paddingRight: '24px' }}
+          >
+            <option value="">Todos os gêneros</option>
+            {Object.entries(TMDB_GENRES)
+              .sort(([,a], [,b]) => a.localeCompare(b))
+              .map(([id, name]) => (
+                <option key={id} value={id}>{name}</option>
+              ))
+            }
+          </select>
+          {selectedGenre && (
+            <>
               <button
-                onClick={() => setSelectedGenre(null)}
-                className={`text-[10px] sm:text-xs px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full font-medium transition-all border ${
-                  selectedGenre === null
-                    ? 'bg-violet-500/20 text-violet-300 border-violet-500/40'
-                    : 'bg-white/[0.03] text-gray-500 border-white/10 hover:text-gray-300 hover:border-white/20'
-                }`}
+                onClick={handleMigrateGenres}
+                disabled={isMigrating}
+                className="bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-[11px] sm:text-xs px-3 py-1.5 rounded-lg font-medium transition-colors"
               >
-                Todos
+                {isMigrating ? 'Aplicando...' : 'Aplicar Filtro'}
               </button>
-              {availableGenres.map(id => (
-                <button
-                  key={id}
-                  onClick={() => setSelectedGenre(selectedGenre === id ? null : id)}
-                  className={`text-[10px] sm:text-xs px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full font-medium transition-all border ${
-                    selectedGenre === id
-                      ? 'bg-violet-500/20 text-violet-300 border-violet-500/40'
-                      : 'bg-white/[0.03] text-gray-500 border-white/10 hover:text-gray-300 hover:border-white/20'
-                  }`}
-                >
-                  {TMDB_GENRES[id]}
-                </button>
-              ))}
-            </div>
-          );
-        })()}
+              <button
+                onClick={() => {
+                  setSelectedGenre(null);
+                  setActiveFilterGenre(null);
+                }}
+                className="text-[10px] text-gray-500 hover:text-white transition-colors ml-1"
+              >
+                ✕ Limpar
+              </button>
+            </>
+          )}
+        </div>
 
         {/* ── Ranking de Filmes ── */}
         {ranking.length === 0 ? (
@@ -432,7 +469,7 @@ export default function TwitchMovieVoting() {
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3">
-            {ranking.filter(m => !selectedGenre || (m.genreIds || []).includes(selectedGenre)).map((movie, index) => {
+            {ranking.filter(m => !activeFilterGenre || m.isNewLocally || (m.genreIds || []).includes(activeFilterGenre)).map((movie, index) => {
               const certStyle = getCertificationStyle(movie.certification);
               const percentage = totalVotes > 0 ? ((movie.count / totalVotes) * 100).toFixed(1) : 0;
               const isWatched = watchedMovies.some(w => w.title.toLowerCase() === movie.name.toLowerCase());
@@ -887,28 +924,14 @@ export default function TwitchMovieVoting() {
 
               {/* Botão de migração de gêneros */}
               <button
-                onClick={async () => {
-                  try {
-                    const res = await fetch(`${API_URL}/api/migrate-genres`, {
-                      method: 'POST',
-                      headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
-                      }
-                    });
-                    const data = await res.json();
-                    if (res.ok) {
-                      alert(`✅ ${data.message} (${data.updated} votos atualizados)`);
-                      fetchRanking();
-                    } else {
-                      alert(`Erro: ${data.error}`);
-                    }
-                  } catch (e) {
-                    alert('Erro de conexão.');
-                  }
-                }}
-                className="w-full mt-3 px-4 py-2 rounded-xl text-xs font-medium transition-all border bg-white/[0.03] text-gray-500 border-white/10 hover:text-gray-300 hover:border-white/20 hover:bg-white/5"
+                onClick={handleMigrateGenres}
+                disabled={isMigrating}
+                className={`w-full mt-3 px-4 py-2 rounded-xl text-xs font-medium transition-all border
+                  ${isMigrating ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.02] hover:bg-white/10'}
+                  bg-white/[0.03] text-gray-500 border-white/10 hover:text-gray-300 hover:border-white/20 hover:bg-white/5
+                `}
               >
-                🔄 Atualizar Gêneros dos Votos
+                {isMigrating ? '🔄 Atualizando Gêneros...' : '🔄 Atualizar Gêneros dos Votos'}
               </button>
             </div>
 

@@ -21,7 +21,9 @@ async function validateMovie(movieName) {
     
     // 1. Tentar pegar do Cache primeiro
     const cachedMovie = await db.collection('movie_cache').findOne({ query: normalizedQuery });
-    if (cachedMovie) {
+    // Só usa o cache se for válido E já possuir o array de gêneros resolvido 
+    // (para invalidar caches antigos da época em que a API não salvava genreIds)
+    if (cachedMovie && (!cachedMovie.result.valid || cachedMovie.result.genreIds !== undefined)) {
       console.log(`[TMDB CACHE HIT] "${movieName}"`);
       return cachedMovie.result;
     }

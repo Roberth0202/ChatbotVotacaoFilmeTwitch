@@ -104,3 +104,9 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(20, 184, 166, 0.5);
 }
+
+/* Dropdown de gênero */
+select option {
+  background: #1a1028;
+  color: #fff;
+}
