@@ -860,9 +860,9 @@ export default function TwitchMovieVoting() {
                   onClick={async () => {
                     if (isTogglingVote) return;
                     setIsTogglingVote(true);
-                    controlInFlightRef.current = Date.now();
                     const nextState = !votingActive;
                     setVotingActive(nextState);
+                    controlInFlightRef.current = Date.now(); // Lock ANTES do fetch para o polling não sobrescrever
                     try {
                       const res = await fetch(`${API_URL}/api/control`, {
                         method: 'POST',
@@ -874,15 +874,16 @@ export default function TwitchMovieVoting() {
                       });
                       if (!res.ok) {
                         setVotingActive(!nextState);
+                        controlInFlightRef.current = 0; // Libera o lock se falhou
                         console.error('Erro ao alterar votação. Token expirado?');
                       }
                     } catch (e) {
                       if (e.name !== 'AbortError') {
                         setVotingActive(!nextState);
+                        controlInFlightRef.current = 0; // Libera o lock se falhou
                         console.error(e);
                       }
                     } finally {
-                      controlInFlightRef.current = Date.now(); // Renew lock after request completes
                       setIsTogglingVote(false);
                     }
                   }}
