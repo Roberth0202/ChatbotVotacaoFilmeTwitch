@@ -45,7 +45,7 @@ export default function TwitchMovieVoting() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isProcessingControl, setIsProcessingControl] = useState(false);
   const [isTogglingVote, setIsTogglingVote] = useState(false);
-  const controlInFlightRef = useRef(false);
+  const controlInFlightRef = useRef(0); // Usa timestamp para evitar cache stale
   const [manualSearch, setManualSearch] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -150,7 +150,8 @@ export default function TwitchMovieVoting() {
       totalVotesRef.current = newTotal;
       setRanking(newRanking);
       setTotalVotes(newTotal);
-      if (!controlInFlightRef.current) {
+      // Evita sobrescrever com cache stale da Vercel (s-maxage=3, swr=5) por 8s
+      if (Date.now() - controlInFlightRef.current > 8000) {
         setVotingActive(data.votingActive || false);
       }
       if (data.watchedMovies) setWatchedMovies(data.watchedMovies);
@@ -859,7 +860,7 @@ export default function TwitchMovieVoting() {
                   onClick={async () => {
                     if (isTogglingVote) return;
                     setIsTogglingVote(true);
-                    controlInFlightRef.current = true;
+                    controlInFlightRef.current = Date.now();
                     const nextState = !votingActive;
                     setVotingActive(nextState);
                     try {
@@ -881,7 +882,7 @@ export default function TwitchMovieVoting() {
                         console.error(e);
                       }
                     } finally {
-                      controlInFlightRef.current = false;
+                      controlInFlightRef.current = Date.now(); // Renew lock after request completes
                       setIsTogglingVote(false);
                     }
                   }}
