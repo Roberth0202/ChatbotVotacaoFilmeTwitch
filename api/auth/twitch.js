@@ -1,14 +1,8 @@
 const jwt = require('jsonwebtoken');
+const { applyCors } = require('../_lib/cors');
 
 module.exports = async function handler(req, res) {
-  // Configuração básica do CORS (igual às outras rotas)
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  if (applyCors(req, res, 'POST, OPTIONS')) return;
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -23,14 +17,18 @@ module.exports = async function handler(req, res) {
   const CLIENT_ID = process.env.TWITCH_CLIENT_ID;
   const CLIENT_SECRET = process.env.TWITCH_CLIENT_SECRET;
   const ALLOWED_CHANNEL = process.env.TWITCH_CHANNEL || 'roberth0202';
-  const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_for_jwt_only_in_dev';
+  const JWT_SECRET = process.env.JWT_SECRET;
+
+  if (!JWT_SECRET) {
+    console.error('[Auth] JWT_SECRET not configured!');
+    return res.status(500).json({ error: 'Server misconfiguration: JWT_SECRET is required' });
+  }
 
   if (!CLIENT_ID || !CLIENT_SECRET) {
     return res.status(500).json({ error: 'Twitch credentials not configured on the server' });
   }
 
   try {
-    // 1. Trocar o 'code' por um Access Token da Twitch
     const tokenResponse = await fetch('https://id.twitch.tv/oauth2/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -52,7 +50,6 @@ module.exports = async function handler(req, res) {
 
     const { access_token } = tokenData;
 
-    // 2. Com o Access Token, pegar o perfil do usuário logado
     const userResponse = await fetch('https://api.twitch.tv/helix/users', {
       method: 'GET',
       headers: {
@@ -70,18 +67,14 @@ module.exports = async function handler(req, res) {
     const user = userData.data[0];
     const username = user.login.toLowerCase();
 
-    // 3. Verificar se é o streamer (o dono real) permitindo o admin
-    // Também podemos permitir mods futuramente, mas para proteção Master,
-    // o canal dono recebe o super JWT.
     if (username !== ALLOWED_CHANNEL.toLowerCase()) {
       return res.status(403).json({ error: `User ${username} is not authorized to be Admin.` });
     }
 
-    // 4. Gerar o JWT assinado
     const jwtToken = jwt.sign(
       { username: username, role: 'admin' },
       JWT_SECRET,
-      { expiresIn: '7d' } // Válido por 7 dias
+      { expiresIn: '7d' }
     );
 
     return res.status(200).json({

@@ -44,6 +44,8 @@ export default function TwitchMovieVoting() {
   const [isAdmin, setIsAdmin] = useState(() => !!localStorage.getItem('adminToken'));
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isProcessingControl, setIsProcessingControl] = useState(false);
+  const [isTogglingVote, setIsTogglingVote] = useState(false);
+  const controlInFlightRef = useRef(false);
   const [manualSearch, setManualSearch] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -52,8 +54,8 @@ export default function TwitchMovieVoting() {
   const [activeFilterGenre, setActiveFilterGenre] = useState(null);
   const [isMigrating, setIsMigrating] = useState(false);
 
+
   const handleMigrateGenres = async () => {
-    setActiveFilterGenre(selectedGenre);
     try {
       setIsMigrating(true);
       const res = await fetch(`${API_URL}/api/migrate-genres`, {
@@ -148,7 +150,9 @@ export default function TwitchMovieVoting() {
       totalVotesRef.current = newTotal;
       setRanking(newRanking);
       setTotalVotes(newTotal);
-      setVotingActive(data.votingActive || false);
+      if (!controlInFlightRef.current) {
+        setVotingActive(data.votingActive || false);
+      }
       if (data.watchedMovies) setWatchedMovies(data.watchedMovies);
 
     } catch (error) {
@@ -427,7 +431,11 @@ export default function TwitchMovieVoting() {
         <div className="mb-4 flex items-center gap-2">
           <select
             value={selectedGenre || ''}
-            onChange={(e) => setSelectedGenre(e.target.value ? Number(e.target.value) : null)}
+            onChange={(e) => {
+              const val = e.target.value ? Number(e.target.value) : null;
+              setSelectedGenre(val);
+              setActiveFilterGenre(val);
+            }}
             className="bg-violet-500/15 text-white text-[11px] sm:text-xs border border-violet-500/30 rounded-lg px-2.5 py-1.5 outline-none focus:border-violet-500/60 transition-colors cursor-pointer appearance-none max-w-[180px]"
             style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23a78bfa' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', paddingRight: '24px' }}
           >
@@ -440,24 +448,15 @@ export default function TwitchMovieVoting() {
             }
           </select>
           {selectedGenre && (
-            <>
-              <button
-                onClick={handleMigrateGenres}
-                disabled={isMigrating}
-                className="bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-[11px] sm:text-xs px-3 py-1.5 rounded-lg font-medium transition-colors"
-              >
-                {isMigrating ? 'Aplicando...' : 'Aplicar Filtro'}
-              </button>
-              <button
-                onClick={() => {
-                  setSelectedGenre(null);
-                  setActiveFilterGenre(null);
-                }}
-                className="text-[10px] text-gray-500 hover:text-white transition-colors ml-1"
-              >
-                ✕ Limpar
-              </button>
-            </>
+            <button
+              onClick={() => {
+                setSelectedGenre(null);
+                setActiveFilterGenre(null);
+              }}
+              className="text-[10px] text-gray-500 hover:text-white transition-colors ml-1"
+            >
+              ✕ Limpar
+            </button>
           )}
         </div>
 
@@ -657,7 +656,7 @@ export default function TwitchMovieVoting() {
                     
                     {/* Dropdown com os Resultados */}
                     {showDropdown && searchResults.length > 0 && (
-                      <div className="absolute w-full mt-2 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 z-[100]">
+                      <div className="absolute w-full mt-2 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-[100]">
                         {searchResults.map((movie) => {
                           const alreadyWatched = watchedMovies.some(w => (w.title || w.name || '').toLowerCase() === movie.title.toLowerCase());
                           return (
@@ -856,9 +855,13 @@ export default function TwitchMovieVoting() {
               
               <div className="flex w-full flex-col sm:flex-row gap-4">
                 <button
+                  disabled={isTogglingVote}
                   onClick={async () => {
+                    if (isTogglingVote) return;
+                    setIsTogglingVote(true);
+                    controlInFlightRef.current = true;
                     const nextState = !votingActive;
-                    setVotingActive(nextState); // OPTIMISTIC UI UPDATE instantâneo
+                    setVotingActive(nextState);
                     try {
                       const res = await fetch(`${API_URL}/api/control`, {
                         method: 'POST',
@@ -869,14 +872,17 @@ export default function TwitchMovieVoting() {
                         body: JSON.stringify({ action: nextState ? 'start' : 'stop' })
                       });
                       if (!res.ok) {
-                        setVotingActive(!nextState); // Revert on fail
+                        setVotingActive(!nextState);
                         console.error('Erro ao alterar votação. Token expirado?');
                       }
                     } catch (e) {
                       if (e.name !== 'AbortError') {
-                        setVotingActive(!nextState); // Revert on fail
+                        setVotingActive(!nextState);
                         console.error(e);
                       }
+                    } finally {
+                      controlInFlightRef.current = false;
+                      setIsTogglingVote(false);
                     }
                   }}
                   className={`flex-1 px-6 py-3 rounded-xl font-medium text-sm transition-all border hover:scale-[1.02] active:scale-[0.98]

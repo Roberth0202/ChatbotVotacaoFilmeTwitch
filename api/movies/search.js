@@ -1,20 +1,14 @@
 const { requireAdmin } = require('../_lib/auth');
 const { searchMovies } = require('../_lib/tmdb');
+const { applyCors } = require('../_lib/cors');
 
 module.exports = async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  if (applyCors(req, res, 'GET, OPTIONS')) return;
 
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Apenas admins podem buscar (pra não sobrecarregar nossa key)
   if (!requireAdmin(req, res)) return;
 
   const { query } = req.query || {};

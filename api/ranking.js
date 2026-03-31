@@ -1,14 +1,10 @@
 const { connectToDatabase } = require('./_lib/mongodb');
+const { getTmdbHeaders, TMDB_BASE_URL } = require('./_lib/tmdb');
+const { applyCors } = require('./_lib/cors');
 
 module.exports = async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (applyCors(req, res, 'GET, OPTIONS')) return;
   res.setHeader('Cache-Control', 's-maxage=3, stale-while-revalidate=5');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
 
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -20,14 +16,13 @@ module.exports = async function handler(req, res) {
     const session = await db.collection('session').findOne({ _id: 'current' });
     const votingActive = session?.votingActive || false;
 
-    // O MongoDB faz todo o trabalho pesado de contar, agrupar as informações do filme e coletar os nomes dos votantes
     const rankingData = await db.collection('votes').aggregate([
       {
         $group: {
-          _id: "$movie", // Agrupa pelo nome do filme
-          count: { $sum: 1 }, // Conta os votos
-          voters: { $push: "$username" }, // Cria um array com o nome de quem votou
-          posterPath: { $first: "$posterPath" }, // Pega o primeiro poster q encontrar
+          _id: "$movie",
+          count: { $sum: 1 },
+          voters: { $push: "$username" },
+          posterPath: { $first: "$posterPath" },
           year: { $first: "$year" },
           overview: { $first: "$overview" },
           voteAverage: { $first: "$voteAverage" },
@@ -36,14 +31,12 @@ module.exports = async function handler(req, res) {
         }
       },
       {
-        $sort: { count: -1 } // Já devolve ordenado do maior pro menor
+        $sort: { count: -1 }
       }
     ]).toArray();
 
-    // Calcula o total de votos somando a contagem de cada filme
     const totalVotes = rankingData.reduce((acc, curr) => acc + curr.count, 0);
 
-    // Formata do jeito que o frontend já espera
     const ranking = rankingData.map(data => ({
       name: data._id,
       count: data.count,
@@ -56,27 +49,19 @@ module.exports = async function handler(req, res) {
       genreIds: data.genreIds || []
     }));
 
-    // Auto-enriquecer votos sem gêneros (awaita para incluir na resposta atual)
+    // Auto-enriquecer votos sem gêneros (sem bloquear a resposta)
     const moviesWithoutGenres = ranking.filter(m => !m.genreIds || m.genreIds.length === 0);
     if (moviesWithoutGenres.length > 0 && process.env.TMDB_API_KEY) {
-      const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
-      const headers = {
-        'Authorization': `Bearer ${process.env.TMDB_API_KEY}`,
-        'Content-Type': 'application/json'
-      };
-
-      await Promise.all(moviesWithoutGenres.map(async (movie) => {
+      Promise.all(moviesWithoutGenres.map(async (movie) => {
         try {
           const searchUrl = `${TMDB_BASE_URL}/search/movie?query=${encodeURIComponent(movie.name)}&language=pt-BR`;
-          const resp = await fetch(searchUrl, { headers });
+          const resp = await fetch(searchUrl, { headers: getTmdbHeaders() });
           if (resp.ok) {
             const data = await resp.json();
             if (data.results && data.results.length > 0) {
               const genreIds = data.results[0].genre_ids || [];
               if (genreIds.length > 0) {
-                // Atualiza o objeto em memória APENAS para a resposta imediata
                 movie.genreIds = genreIds;
-                // Salva no banco em background (sem await) para acelerar a request
                 db.collection('votes').updateMany(
                   { movie: movie.name },
                   { $set: { genreIds } }
@@ -87,7 +72,7 @@ module.exports = async function handler(req, res) {
         } catch (e) {
           // Fallback silencioso
         }
-      }));
+      })).catch(() => {});
     }
 
     const watchedMovies = await db.collection('watched').find({}).sort({ markedAt: -1 }).toArray();

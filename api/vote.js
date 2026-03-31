@@ -1,22 +1,11 @@
 const { connectToDatabase } = require('./_lib/mongodb');
 const { requireAdmin } = require('./_lib/auth');
 const { validateMovie } = require('./_lib/tmdb');
-
-const MAX_INPUT_LENGTH = 100;
-
-function sanitizeInput(input) {
-  if (typeof input !== 'string') return '';
-  return input.trim().slice(0, MAX_INPUT_LENGTH).replace(/[<>{}]/g, '');
-}
+const { sanitizeInput } = require('./_lib/sanitize');
+const { applyCors } = require('./_lib/cors');
 
 module.exports = async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  if (applyCors(req, res, 'POST, OPTIONS')) return;
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -38,7 +27,6 @@ module.exports = async function handler(req, res) {
   try {
     const { db } = await connectToDatabase();
 
-    // Roda essas 3 tarefas PESADAS ao mesmo tempo (em paralelo) em vez de uma por uma!
     const [session, validation, previousVoteDoc] = await Promise.all([
       db.collection('session').findOne({ _id: 'current' }),
       validateMovie(sanitizedMovie),
@@ -59,7 +47,6 @@ module.exports = async function handler(req, res) {
     const movieTitle = validation.title || sanitizedMovie;
     const previousVote = previousVoteDoc?.movie || null;
 
-    // Upsert vote
     await db.collection('votes').updateOne(
       { username },
       {
@@ -78,8 +65,6 @@ module.exports = async function handler(req, res) {
       { upsert: true }
     );
 
-    // Retirada da contagem de `countDocuments` pois o bot não utiliza isso e é lento em coleções grandes.
-    
     return res.status(200).json({
       success: true,
       username,

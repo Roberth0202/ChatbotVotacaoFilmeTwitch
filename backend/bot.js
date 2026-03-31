@@ -26,7 +26,7 @@ if (!TWITCH_USERNAME || !TWITCH_OAUTH || !TWITCH_CHANNEL) {
 }
 
 const client = new tmi.Client({
-  options: { debug: true },
+  options: { debug: false },
   identity: {
     username: TWITCH_USERNAME,
     password: TWITCH_OAUTH

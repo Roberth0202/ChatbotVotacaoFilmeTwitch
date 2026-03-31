@@ -1,28 +1,16 @@
 const { connectToDatabase } = require('./_lib/mongodb');
+const { getTmdbHeaders, TMDB_BASE_URL } = require('./_lib/tmdb');
 const { requireAdmin } = require('./_lib/auth');
-
-const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
-
-function getTmdbHeaders() {
-  return {
-    'Authorization': `Bearer ${process.env.TMDB_API_KEY}`,
-    'Content-Type': 'application/json'
-  };
-}
+const { applyCors } = require('./_lib/cors');
 
 module.exports = async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (applyCors(req, res, 'POST, OPTIONS')) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   if (!requireAdmin(req, res)) return;
 
   try {
     const { db } = await connectToDatabase();
 
-    // Buscar votos sem genreIds
     const votes = await db.collection('votes').find({
       $or: [
         { genreIds: { $exists: false } },
@@ -35,7 +23,6 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ success: true, message: 'Todos os votos já possuem gêneros.', updated: 0 });
     }
 
-    // Agrupar votos por filme (evita buscar o mesmo filme várias vezes)
     const uniqueMovies = [...new Set(votes.map(v => v.movie))];
     let updated = 0;
 
@@ -64,7 +51,7 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    return res.status(200).json({ success: true, message: `Migração concluída.`, updated, total: votes.length });
+    return res.status(200).json({ success: true, message: 'Migração concluída.', updated, total: votes.length });
   } catch (error) {
     console.error('[MIGRATE] Error:', error);
     return res.status(500).json({ error: 'Internal server error' });

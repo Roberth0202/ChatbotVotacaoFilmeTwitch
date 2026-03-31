@@ -8,6 +8,32 @@ function getTmdbHeaders() {
   };
 }
 
+async function fetchCertification(movieId) {
+  try {
+    const certUrl = `${TMDB_BASE_URL}/movie/${movieId}/release_dates`;
+    const certResponse = await fetch(certUrl, { headers: getTmdbHeaders() });
+    if (!certResponse.ok) return null;
+
+    const certData = await certResponse.json();
+
+    const brRelease = certData.results?.find(r => r.iso_3166_1 === 'BR');
+    if (brRelease && brRelease.release_dates?.length > 0) {
+      const cert = brRelease.release_dates[0].certification;
+      if (cert) return cert;
+    }
+
+    const usRelease = certData.results?.find(r => r.iso_3166_1 === 'US');
+    if (usRelease && usRelease.release_dates?.length > 0) {
+      return usRelease.release_dates[0].certification || null;
+    }
+
+    return null;
+  } catch (e) {
+    console.error('[TMDB] Error fetching certification:', e.message);
+    return null;
+  }
+}
+
 async function validateMovie(movieName) {
   const TMDB_TOKEN = process.env.TMDB_API_KEY;
   if (!TMDB_TOKEN) {
@@ -19,10 +45,7 @@ async function validateMovie(movieName) {
   try {
     const { db } = await connectToDatabase();
     
-    // 1. Tentar pegar do Cache primeiro
     const cachedMovie = await db.collection('movie_cache').findOne({ query: normalizedQuery });
-    // Só usa o cache se for válido E já possuir o array de gêneros resolvido 
-    // (para invalidar caches antigos da época em que a API não salvava genreIds)
     if (cachedMovie && (!cachedMovie.result.valid || cachedMovie.result.genreIds !== undefined)) {
       console.log(`[TMDB CACHE HIT] "${movieName}"`);
       return cachedMovie.result;
@@ -40,27 +63,7 @@ async function validateMovie(movieName) {
 
     if (data.results && data.results.length > 0) {
       const movie = data.results[0];
-
-      let certification = null;
-      try {
-        const certUrl = `${TMDB_BASE_URL}/movie/${movie.id}/release_dates`;
-        const certResponse = await fetch(certUrl, { headers: getTmdbHeaders() });
-        if (certResponse.ok) {
-          const certData = await certResponse.json();
-          const brRelease = certData.results?.find(r => r.iso_3166_1 === 'BR');
-          if (brRelease && brRelease.release_dates?.length > 0) {
-            certification = brRelease.release_dates[0].certification || null;
-          }
-          if (!certification) {
-            const usRelease = certData.results?.find(r => r.iso_3166_1 === 'US');
-            if (usRelease && usRelease.release_dates?.length > 0) {
-              certification = usRelease.release_dates[0].certification || null;
-            }
-          }
-        }
-      } catch (e) {
-        console.error('[TMDB] Error fetching certification:', e.message);
-      }
+      const certification = await fetchCertification(movie.id);
 
       const resultObj = {
         valid: true,
@@ -74,7 +77,6 @@ async function validateMovie(movieName) {
         certification
       };
 
-      // 2. Salva o resultado válido no cache
       await db.collection('movie_cache').insertOne({
         query: normalizedQuery,
         result: resultObj,
@@ -84,7 +86,6 @@ async function validateMovie(movieName) {
       return resultObj;
     }
 
-    // 3. Salva o "Não encontrado" no cache também, para evitar spam
     const notFoundResult = { valid: false };
     await db.collection('movie_cache').insertOne({
       query: normalizedQuery,
@@ -118,30 +119,9 @@ async function searchMovies(query) {
 
     const data = await response.json();
     if (data.results && data.results.length > 0) {
-      // Buscar certification para cada filme dos top 5
       const results = await Promise.all(
         data.results.slice(0, 5).map(async (movie) => {
-          let certification = null;
-          try {
-            const certUrl = `${TMDB_BASE_URL}/movie/${movie.id}/release_dates`;
-            const certResponse = await fetch(certUrl, { headers: getTmdbHeaders() });
-            if (certResponse.ok) {
-              const certData = await certResponse.json();
-              const brRelease = certData.results?.find(r => r.iso_3166_1 === 'BR');
-              if (brRelease && brRelease.release_dates?.length > 0) {
-                certification = brRelease.release_dates[0].certification || null;
-              }
-              if (!certification) {
-                const usRelease = certData.results?.find(r => r.iso_3166_1 === 'US');
-                if (usRelease && usRelease.release_dates?.length > 0) {
-                  certification = usRelease.release_dates[0].certification || null;
-                }
-              }
-            }
-          } catch (e) {
-            // Ignora erro de certification, não é crítico
-          }
-
+          const certification = await fetchCertification(movie.id);
           return {
             id: movie.id,
             title: movie.title,
@@ -163,4 +143,4 @@ async function searchMovies(query) {
   }
 }
 
-module.exports = { validateMovie, searchMovies };
+module.exports = { validateMovie, searchMovies, getTmdbHeaders, TMDB_BASE_URL };

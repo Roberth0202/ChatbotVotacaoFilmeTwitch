@@ -1,15 +1,10 @@
 const { connectToDatabase } = require('./_lib/mongodb');
 const { requireAdmin } = require('./_lib/auth');
 const { validateMovie } = require('./_lib/tmdb');
+const { applyCors } = require('./_lib/cors');
 
 module.exports = async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  if (applyCors(req, res, 'GET, POST, DELETE, OPTIONS')) return;
 
   try {
     const { db } = await connectToDatabase();
@@ -33,7 +28,6 @@ module.exports = async function handler(req, res) {
         return res.status(400).json({ error: 'movieName is required' });
       }
 
-      // Check if already watched
       const existing = await db.collection('watched').findOne({
         titleLower: movieName.toLowerCase().trim()
       });

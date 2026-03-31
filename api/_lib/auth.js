@@ -9,7 +9,11 @@ function requireAdmin(req, res) {
   }
 
   const token = authHeader.split(' ')[1];
-  const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_for_jwt_only_in_dev';
+  const JWT_SECRET = process.env.JWT_SECRET;
+  if (!JWT_SECRET) {
+    res.status(500).json({ error: 'Server misconfiguration: JWT_SECRET is required' });
+    return false;
+  }
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
