@@ -285,8 +285,9 @@ export default function TwitchMovieVoting() {
       <header className="border-b border-white/5">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6">
           <div className="flex items-center justify-between">
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white">
-              🎬 Votação de Filmes
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white flex items-center gap-3">
+              <img src="/icone_UzFlix.ico" alt="UzFlix Logo" className="w-8 h-8 sm:w-10 sm:h-10 object-contain drop-shadow-md" />
+              Votação de UzFlix
             </h1>
 
             <div className="flex items-center gap-2 sm:gap-3">
