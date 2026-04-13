@@ -53,6 +53,7 @@ export default function TwitchMovieVoting() {
   const [selectedGenre, setSelectedGenre] = useState(null);
   const [activeFilterGenre, setActiveFilterGenre] = useState(null);
   const [isMigrating, setIsMigrating] = useState(false);
+  const [authError, setAuthError] = useState(null);
 
 
   const handleMigrateGenres = async () => {
@@ -185,11 +186,11 @@ export default function TwitchMovieVoting() {
           localStorage.setItem('adminToken', data.token);
           setIsAdmin(true);
         } else {
-          console.warn('Login negado:', data.error || 'Falha na autorização');
+          setAuthError('Você não tem permissão para acessar o painel. Apenas moderadores e o streamer podem logar.');
         }
       })
       .catch(err => {
-        console.error('Erro na API de Auth:', err);
+        setAuthError('Erro ao se comunicar com o servidor. Tente novamente.');
       })
       .finally(() => {
         setIsLoggingIn(false);
@@ -1055,6 +1056,34 @@ export default function TwitchMovieVoting() {
         </div>
 
       </main>
+
+      {/* ── Popup de Erro de Autorização ── */}
+      {authError && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setAuthError(null)}>
+          <div 
+            className="bg-[#1a1832] border border-red-500/20 rounded-2xl p-6 sm:p-8 max-w-sm w-full shadow-2xl shadow-red-500/10 motion-safe:animate-slideDown"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-col items-center text-center">
+              <div className="w-14 h-14 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
+                <svg className="w-7 h-7 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold text-white mb-2">Acesso Negado</h3>
+              <p className="text-sm text-gray-400 mb-6 leading-relaxed">
+                {authError}
+              </p>
+              <button
+                onClick={() => setAuthError(null)}
+                className="w-full bg-white/10 hover:bg-white/15 text-white py-2.5 rounded-xl font-medium text-sm transition-all border border-white/10"
+              >
+                Entendi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
