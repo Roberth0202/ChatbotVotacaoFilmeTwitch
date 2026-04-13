@@ -16,7 +16,10 @@ module.exports = async function handler(req, res) {
 
   const CLIENT_ID = process.env.TWITCH_CLIENT_ID;
   const CLIENT_SECRET = process.env.TWITCH_CLIENT_SECRET;
-  const ALLOWED_CHANNEL = process.env.TWITCH_CHANNEL || 'roberth0202';
+  // ADMIN_TWITCH_USERNAME define quem pode ser admin. Suporta lista: "user1,user2"
+  // Se não configurado, cai somente para o dono do canal (TWITCH_CHANNEL)
+  const ADMIN_USERNAMES_RAW = process.env.ADMIN_TWITCH_USERNAME || process.env.TWITCH_CHANNEL || '';
+  const ALLOWED_ADMINS = ADMIN_USERNAMES_RAW.toLowerCase().split(',').map(u => u.trim()).filter(Boolean);
   const JWT_SECRET = process.env.JWT_SECRET;
 
   if (!JWT_SECRET) {
@@ -67,7 +70,7 @@ module.exports = async function handler(req, res) {
     const user = userData.data[0];
     const username = user.login.toLowerCase();
 
-    if (username !== ALLOWED_CHANNEL.toLowerCase()) {
+    if (!ALLOWED_ADMINS.includes(username)) {
       return res.status(403).json({ error: `User ${username} is not authorized to be Admin.` });
     }
 
