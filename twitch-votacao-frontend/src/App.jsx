@@ -167,14 +167,16 @@ export default function TwitchMovieVoting() {
     const code = params.get('code');
     
     if (code && !isAdmin && !isLoggingIn) {
+      // Limpa a URL IMEDIATAMENTE para evitar loop de re-execução
+      window.history.replaceState({}, document.title, window.location.pathname);
       setIsLoggingIn(true);
-      // Falar com a nossa própria API para trocar o code pelo JWT
+
       fetch(`${API_URL}/api/auth/twitch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           code,
-          redirectUri: window.location.origin // Onde o React está rodando
+          redirectUri: window.location.origin
         })
       })
       .then(res => res.json())
@@ -182,14 +184,12 @@ export default function TwitchMovieVoting() {
         if (data.success && data.token) {
           localStorage.setItem('adminToken', data.token);
           setIsAdmin(true);
-          window.history.replaceState({}, document.title, window.location.pathname); // Limpa a URL
         } else {
-          alert(`Erro no Login: ${data.error || 'Falha na autorização'}`);
+          console.warn('Login negado:', data.error || 'Falha na autorização');
         }
       })
       .catch(err => {
         console.error('Erro na API de Auth:', err);
-        alert('Falha ao se comunicar com o servidor de login.');
       })
       .finally(() => {
         setIsLoggingIn(false);
