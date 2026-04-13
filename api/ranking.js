@@ -31,7 +31,7 @@ module.exports = async function handler(req, res) {
         }
       },
       {
-        $sort: { count: -1 }
+        $sort: { count: -1, _id: 1 }
       }
     ]).toArray();
 

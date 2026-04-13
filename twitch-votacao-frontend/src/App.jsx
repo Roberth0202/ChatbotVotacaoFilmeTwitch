@@ -149,7 +149,7 @@ export default function TwitchMovieVoting() {
 
       prevRankingRef.current = newRanking;
       totalVotesRef.current = newTotal;
-      setRanking(newRanking);
+      setRanking(newRanking.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)));
       setTotalVotes(newTotal);
       // Evita sobrescrever com cache stale da Vercel (s-maxage=3, swr=5) por 8s
       if (Date.now() - controlInFlightRef.current > 8000) {
@@ -198,29 +198,33 @@ export default function TwitchMovieVoting() {
     }
   }, [isAdmin, isLoggingIn]);
 
+  const intervalRef = useRef(null);
+
+  const startPolling = useCallback(() => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    intervalRef.current = setInterval(fetchRanking, POLLING_INTERVAL);
+  }, [fetchRanking]);
+
   useEffect(() => {
     fetchRanking();
-    const interval = setInterval(fetchRanking, POLLING_INTERVAL);
+    startPolling();
 
-    // Pausar/retomar polling baseado na visibilidade da aba
-    let resumeInterval;
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        clearInterval(interval);
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
       } else {
         fetchRanking();
-        resumeInterval = setInterval(fetchRanking, POLLING_INTERVAL);
+        startPolling();
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
-
     return () => {
-      clearInterval(interval);
-      if (resumeInterval) clearInterval(resumeInterval);
+      clearInterval(intervalRef.current);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [fetchRanking]);
+  }, [fetchRanking, startPolling]);
 
   // Efeito trigado sempre que o WebSocket recebe um voto (!votar ou !v) na Twitch
   useEffect(() => {
@@ -249,7 +253,7 @@ export default function TwitchMovieVoting() {
           m.name.toLowerCase() === movieName.toLowerCase() 
             ? { ...m, count: m.count + 1, voters: [...m.voters, username] } 
             : m
-        ).sort((a, b) => b.count - a.count);
+        ).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
       }
       
       // Filme novo: fetch com delay para dar tempo do backend (Node ou Vercel) buscar a API do TMDB e salvar
@@ -262,7 +266,7 @@ export default function TwitchMovieVoting() {
         voters: [username],
         genreIds: [], // Sem lista inicialmente
         isNewLocally: true // Flag exclusiva para ele furar o filtro enquanto carrega
-      }].sort((a, b) => b.count - a.count);
+      }].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
     });
 
     // 2. Somente o navegador que tem a autorização salva os votos no MongoDB
