@@ -285,10 +285,18 @@ export default function TwitchMovieVoting() {
       <header className="border-b border-white/5">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6">
           <div className="flex items-center justify-between">
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white flex items-center gap-3">
-              <img src="/icone_UzFlix.ico" alt="UzFlix Logo" className="w-8 h-8 sm:w-10 sm:h-10 object-contain drop-shadow-md" />
-              Votação de UzFlix
-            </h1>
+            <div className="flex items-center gap-3 sm:gap-4">
+              <svg className="w-10 h-10 sm:w-12 sm:h-12 shrink-0 shadow-lg shadow-violet-500/20 rounded-xl" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="32" height="32" rx="8" fill="#7c3aed"/>
+                <polygon points="12,9 26,16 12,23" fill="white"/>
+              </svg>
+              <div className="flex flex-col leading-tight">
+                <span className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
+                  Uz<span className="text-violet-400">Flix</span>
+                </span>
+                <span className="text-xs sm:text-sm text-white/40 tracking-wider font-medium mt-0.5 uppercase">votação de filmes</span>
+              </div>
+            </div>
 
             <div className="flex items-center gap-2 sm:gap-3">
               <div className="inline-flex items-center gap-2 bg-white/5 border border-white/5 rounded-full px-3 py-1.5">
@@ -301,9 +309,14 @@ export default function TwitchMovieVoting() {
                     Lendo Votos
                   </span>
                 )}
-                {chatConnected && !isAdmin && (
+                {chatConnected && !isAdmin && !votingActive && (
                   <span className="text-[10px] text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded ml-1 border border-red-500/20" title="Faça login como Admin para contabilizar votos">
-                    Votos Pausados (Faça Login)
+                    Votos Pausados
+                  </span>
+                )}
+                {chatConnected && !isAdmin && votingActive && (
+                  <span className="text-[10px] text-violet-400 bg-violet-500/10 px-1.5 py-0.5 rounded ml-1 border border-violet-500/20" title="Você está assistindo os votos entrarem">
+                    Acompanhando ao vivo
                   </span>
                 )}
               </div>

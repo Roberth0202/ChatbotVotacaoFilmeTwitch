@@ -1,9 +1,9 @@
 {
-  "short_name": "Votação Filmes",
-  "name": "Votação de Filmes - Twitch",
+  "short_name": "Votação UzFlix",
+  "name": "UzFlix",
   "icons": [
     {
-      "src": "favicon.ico",
+      "src": "icone_UzFlix.ico",
       "sizes": "64x64 32x32 24x24 16x16",
       "type": "image/x-icon"
     }
