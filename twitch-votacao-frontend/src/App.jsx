@@ -41,7 +41,7 @@ export default function TwitchMovieVoting() {
   const [expandedMovies, setExpandedMovies] = useState({});
   const [watchedMovies, setWatchedMovies] = useState([]);
   const [activeTab, setActiveTab] = useState('votacao'); // 'votacao', 'assistidos', 'admin'
-  const [isAdmin, setIsAdmin] = useState(() => !!localStorage.getItem('adminToken'));
+  const [isAdmin, setIsAdmin] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isProcessingControl, setIsProcessingControl] = useState(false);
   const [isTogglingVote, setIsTogglingVote] = useState(false);
@@ -54,6 +54,28 @@ export default function TwitchMovieVoting() {
   const [activeFilterGenre, setActiveFilterGenre] = useState(null);
   const [isMigrating, setIsMigrating] = useState(false);
   const [authError, setAuthError] = useState(null);
+
+  // Security: Validate stored token with backend on mount
+  useEffect(() => {
+    const token = localStorage.getItem('adminToken');
+    if (!token) return;
+
+    fetch(`${API_URL}/api/auth/verify`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    .then(res => {
+      if (res.ok) {
+        setIsAdmin(true);
+      } else {
+        localStorage.removeItem('adminToken');
+        setIsAdmin(false);
+      }
+    })
+    .catch(() => {
+      localStorage.removeItem('adminToken');
+      setIsAdmin(false);
+    });
+  }, []);
 
 
   const handleMigrateGenres = async () => {
@@ -1047,7 +1069,7 @@ export default function TwitchMovieVoting() {
                   return;
                 }
                 const redirectUri = window.location.origin; // ex: http://localhost:3000
-                const authUrl = `https://id.twitch.tv/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code`;
+                const authUrl = `https://id.twitch.tv/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=user:read:email`;
                 window.location.href = authUrl;
               }}
               disabled={isLoggingIn}

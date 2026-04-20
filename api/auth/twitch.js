@@ -77,7 +77,7 @@ module.exports = async function handler(req, res) {
     const jwtToken = jwt.sign(
       { username: username, role: 'admin' },
       JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: '24h' }
     );
 
     return res.status(200).json({
