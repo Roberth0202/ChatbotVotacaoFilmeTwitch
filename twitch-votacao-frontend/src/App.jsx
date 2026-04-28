@@ -54,6 +54,7 @@ export default function TwitchMovieVoting() {
   const [activeFilterGenre, setActiveFilterGenre] = useState(null);
   const [isMigrating, setIsMigrating] = useState(false);
   const [authError, setAuthError] = useState(null);
+  const [guideOpen, setGuideOpen] = useState(false);
 
   // Security: Validate stored token with backend on mount
   useEffect(() => {
@@ -982,6 +983,145 @@ export default function TwitchMovieVoting() {
               >
                 {isMigrating ? '🔄 Atualizando Gêneros...' : '🔄 Atualizar Gêneros dos Votos'}
               </button>
+            </div>
+
+            {/* ── GUIA DE COMANDOS E CONTROLES ── */}
+            <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-6 sm:p-8">
+              <button
+                onClick={() => setGuideOpen(!guideOpen)}
+                className="w-full flex items-center justify-between cursor-pointer group"
+              >
+                <div className="flex flex-col items-start">
+                  <h3 className="text-gray-300 font-medium text-sm flex items-center gap-2 group-hover:text-white transition-colors">📖 Guia de Comandos e Controles</h3>
+                  <p className="text-[10px] sm:text-xs text-gray-500 mt-1">O que funciona no chat da Twitch e o que é controlado por aqui no painel.</p>
+                </div>
+                <span className={`text-gray-500 group-hover:text-white transition-all duration-300 text-lg ${guideOpen ? 'rotate-180' : ''}`}>▼</span>
+              </button>
+
+              {guideOpen && (<div className="mt-5 space-y-0 motion-safe:animate-fadeIn">
+              {/* ── Comando ativo no chat ── */}
+              <div className="mb-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-[10px] uppercase tracking-wider font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">✅ Ativo no Chat</span>
+                  <span className="text-[10px] text-gray-600">— funciona via WebSocket (sem bot)</span>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 bg-emerald-500/[0.03] rounded-xl p-3 border border-emerald-500/10 hover:border-emerald-500/20 transition-colors">
+                    <code className="text-emerald-400 font-mono text-xs sm:text-sm whitespace-nowrap shrink-0">!votar &lt;filme&gt;</code>
+                    <span className="text-gray-400 text-xs hidden sm:inline mt-0.5">—</span>
+                    <div className="flex flex-col">
+                      <span className="text-gray-300 text-xs sm:text-sm">Viewers votam em um filme pelo chat. Pode trocar o voto a qualquer momento.</span>
+                      <span className="text-[10px] text-gray-600 mt-0.5">Atalho: <code className="text-gray-500 font-mono">!v &lt;filme&gt;</code></span>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-[10px] text-gray-600 mt-2 ml-1">O site lê o chat da Twitch em tempo real e registra os votos automaticamente quando o admin está logado.</p>
+              </div>
+
+              {/* ── Controles do Painel Admin ── */}
+              <div className="mb-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-[10px] uppercase tracking-wider font-bold text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded border border-violet-500/20">🎛️ Painel Admin</span>
+                  <span className="text-[10px] text-gray-600">— botões acima nesta página</span>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 bg-white/[0.02] rounded-xl p-3 border border-white/5 hover:border-violet-500/10 transition-colors">
+                    <span className="text-violet-400 text-xs sm:text-sm whitespace-nowrap shrink-0 font-medium">Iniciar Votação</span>
+                    <span className="text-gray-400 text-xs hidden sm:inline mt-0.5">—</span>
+                    <span className="text-gray-300 text-xs sm:text-sm">Abre uma nova rodada de votação e limpa os votos anteriores.</span>
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 bg-white/[0.02] rounded-xl p-3 border border-white/5 hover:border-violet-500/10 transition-colors">
+                    <span className="text-violet-400 text-xs sm:text-sm whitespace-nowrap shrink-0 font-medium">Pausar Votação</span>
+                    <span className="text-gray-400 text-xs hidden sm:inline mt-0.5">—</span>
+                    <span className="text-gray-300 text-xs sm:text-sm">Encerra a votação atual. Os votos ficam salvos para consulta.</span>
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 bg-white/[0.02] rounded-xl p-3 border border-white/5 hover:border-violet-500/10 transition-colors">
+                    <span className="text-violet-400 text-xs sm:text-sm whitespace-nowrap shrink-0 font-medium">Limpar Votos</span>
+                    <span className="text-gray-400 text-xs hidden sm:inline mt-0.5">—</span>
+                    <span className="text-gray-300 text-xs sm:text-sm">Apaga todos os votos sem alterar o estado da votação (aberta/fechada).</span>
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 bg-white/[0.02] rounded-xl p-3 border border-white/5 hover:border-violet-500/10 transition-colors">
+                    <span className="text-violet-400 text-xs sm:text-sm whitespace-nowrap shrink-0 font-medium">Marcar como Visto</span>
+                    <span className="text-gray-400 text-xs hidden sm:inline mt-0.5">—</span>
+                    <span className="text-gray-300 text-xs sm:text-sm">Transfere um filme do ranking para a lista de "Assistidos" (na seção abaixo ou aba Assistidos).</span>
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 bg-white/[0.02] rounded-xl p-3 border border-white/5 hover:border-violet-500/10 transition-colors">
+                    <span className="text-violet-400 text-xs sm:text-sm whitespace-nowrap shrink-0 font-medium">Adicionar Assistido</span>
+                    <span className="text-gray-400 text-xs hidden sm:inline mt-0.5">—</span>
+                    <span className="text-gray-300 text-xs sm:text-sm">Busca e adiciona um filme diretamente à lista de assistidos (na aba Assistidos).</span>
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 bg-white/[0.02] rounded-xl p-3 border border-white/5 hover:border-violet-500/10 transition-colors">
+                    <span className="text-violet-400 text-xs sm:text-sm whitespace-nowrap shrink-0 font-medium">Atualizar Gêneros</span>
+                    <span className="text-gray-400 text-xs hidden sm:inline mt-0.5">—</span>
+                    <span className="text-gray-300 text-xs sm:text-sm">Preenche gêneros faltando nos votos antigos (migração de dados).</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Comandos do Bot (inativos) ── */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-[10px] uppercase tracking-wider font-bold text-gray-500 bg-white/5 px-2 py-0.5 rounded border border-white/10">🤖 Bot (Inativo)</span>
+                  <span className="text-[10px] text-gray-600">— precisam do bot hospedado para funcionar</span>
+                </div>
+                <div className="space-y-2 opacity-50">
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 bg-white/[0.01] rounded-xl p-3 border border-white/5">
+                    <code className="text-gray-500 font-mono text-xs sm:text-sm whitespace-nowrap shrink-0">!meuvoto</code>
+                    <span className="text-gray-600 text-xs hidden sm:inline mt-0.5">—</span>
+                    <span className="text-gray-500 text-xs sm:text-sm">Mostra em qual filme o viewer votou. <span className="text-[10px]">(atalhos: !mv, !myvote)</span></span>
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 bg-white/[0.01] rounded-xl p-3 border border-white/5">
+                    <code className="text-gray-500 font-mono text-xs sm:text-sm whitespace-nowrap shrink-0">!top3</code>
+                    <span className="text-gray-600 text-xs hidden sm:inline mt-0.5">—</span>
+                    <span className="text-gray-500 text-xs sm:text-sm">Mostra os 3 mais votados no chat. <span className="text-[10px]">(atalho: !t3)</span></span>
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 bg-white/[0.01] rounded-xl p-3 border border-white/5">
+                    <code className="text-gray-500 font-mono text-xs sm:text-sm whitespace-nowrap shrink-0">!assistidos</code>
+                    <span className="text-gray-600 text-xs hidden sm:inline mt-0.5">—</span>
+                    <span className="text-gray-500 text-xs sm:text-sm">Lista filmes já assistidos no chat.</span>
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 bg-white/[0.01] rounded-xl p-3 border border-white/5">
+                    <code className="text-gray-500 font-mono text-xs sm:text-sm whitespace-nowrap shrink-0">!ajuda</code>
+                    <span className="text-gray-600 text-xs hidden sm:inline mt-0.5">—</span>
+                    <span className="text-gray-500 text-xs sm:text-sm">Mostra comandos disponíveis no chat. <span className="text-[10px]">(atalho: !help)</span></span>
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 bg-white/[0.01] rounded-xl p-3 border border-white/5">
+                    <code className="text-gray-500 font-mono text-xs sm:text-sm whitespace-nowrap shrink-0">!iniciarvotacao</code>
+                    <span className="text-gray-600 text-xs hidden sm:inline mt-0.5">—</span>
+                    <span className="text-gray-500 text-xs sm:text-sm">Abre votação pelo chat (mod). <span className="text-[10px]">(atalho: !iv)</span></span>
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 bg-white/[0.01] rounded-xl p-3 border border-white/5">
+                    <code className="text-gray-500 font-mono text-xs sm:text-sm whitespace-nowrap shrink-0">!encerrar</code>
+                    <span className="text-gray-600 text-xs hidden sm:inline mt-0.5">—</span>
+                    <span className="text-gray-500 text-xs sm:text-sm">Encerra e anuncia vencedor no chat (mod). <span className="text-[10px]">(atalho: !endvote)</span></span>
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 bg-white/[0.01] rounded-xl p-3 border border-white/5">
+                    <code className="text-gray-500 font-mono text-xs sm:text-sm whitespace-nowrap shrink-0">!limparvotos</code>
+                    <span className="text-gray-600 text-xs hidden sm:inline mt-0.5">—</span>
+                    <span className="text-gray-500 text-xs sm:text-sm">Limpa votos pelo chat (mod). <span className="text-[10px]">(atalhos: !lv, !clearvotes)</span></span>
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 bg-white/[0.01] rounded-xl p-3 border border-white/5">
+                    <code className="text-gray-500 font-mono text-xs sm:text-sm whitespace-nowrap shrink-0">!assistido &lt;filme&gt;</code>
+                    <span className="text-gray-600 text-xs hidden sm:inline mt-0.5">—</span>
+                    <span className="text-gray-500 text-xs sm:text-sm">Marca filme como assistido pelo chat (mod).</span>
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 bg-white/[0.01] rounded-xl p-3 border border-white/5">
+                    <code className="text-gray-500 font-mono text-xs sm:text-sm whitespace-nowrap shrink-0">!remassistido &lt;filme&gt;</code>
+                    <span className="text-gray-600 text-xs hidden sm:inline mt-0.5">—</span>
+                    <span className="text-gray-500 text-xs sm:text-sm">Remove filme dos assistidos pelo chat (mod). <span className="text-[10px]">(atalho: !ra)</span></span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dica */}
+              <div className="mt-5 bg-violet-500/5 border border-violet-500/10 rounded-xl p-3 flex items-start gap-2.5">
+                <span className="text-sm mt-0.5">💡</span>
+                <p className="text-[10px] sm:text-xs text-gray-400 leading-relaxed">
+                  Os filmes são validados pelo TMDB — nomes inválidos são rejeitados automaticamente.
+                  Viewers podem trocar o voto quantas vezes quiserem. Os comandos do bot ficam disponíveis ao hospedar o <code className="text-gray-500 font-mono">bot.js</code>.
+                </p>
+              </div>
+              </div>)}
             </div>
 
             {/* ── LISTA MINIMALISTA DE VENCEDORES ── */}
