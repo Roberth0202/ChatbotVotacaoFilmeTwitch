@@ -302,18 +302,12 @@ export default function TwitchMovieVoting() {
       }].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
     });
 
-    // 2. Somente o navegador que tem a autorização salva os votos no MongoDB
-    const token = localStorage.getItem('adminToken');
-    if (token) {
-      fetch(`${API_URL}/api/vote`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ username, movieName })
-      }).catch(err => console.error('Erro ao enviar voto pro BD:', err));
-    }
+    // 2. Persiste o voto no MongoDB (endpoint público)
+    fetch(`${API_URL}/api/vote`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, movieName })
+    }).catch(err => console.error('Erro ao enviar voto pro BD:', err));
   }, [lastVoteEvent, fetchRanking]);
 
   return (
