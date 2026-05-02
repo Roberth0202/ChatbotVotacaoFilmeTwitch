@@ -1,5 +1,6 @@
 const { connectToDatabase } = require('./_lib/mongodb');
 const { validateMovie } = require('./_lib/tmdb');
+const { validateTwitchUsername } = require('./_lib/twitchUser');
 const { sanitizeInput } = require('./_lib/sanitize');
 const { applyCors } = require('./_lib/cors');
 
@@ -24,14 +25,22 @@ module.exports = async function handler(req, res) {
   try {
     const { db } = await connectToDatabase();
 
-    const [session, validation, previousVoteDoc] = await Promise.all([
+    const [session, validation, twitchCheck, previousVoteDoc] = await Promise.all([
       db.collection('session').findOne({ _id: 'current' }),
       validateMovie(sanitizedMovie),
+      validateTwitchUsername(username),
       db.collection('votes').findOne({ username })
     ]);
 
     if (!session?.votingActive) {
       return res.status(400).json({ error: 'Voting is not active', code: 'VOTING_CLOSED' });
+    }
+
+    if (!twitchCheck.valid) {
+      return res.status(403).json({
+        error: `Username "${username}" is not a valid Twitch account`,
+        code: 'INVALID_TWITCH_USER'
+      });
     }
 
     if (!validation.valid) {
