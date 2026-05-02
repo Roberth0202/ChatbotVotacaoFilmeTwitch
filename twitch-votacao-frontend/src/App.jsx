@@ -4,7 +4,7 @@ import { useTwitchChat } from './hooks/useTwitchChat';
 
 const API_URL = process.env.REACT_APP_API_URL || '';
 const TMDB_IMAGE_URL = 'https://image.tmdb.org/t/p/w500';
-const POLLING_INTERVAL = 10000; // Backup do WebSocket — fetch sob demanda cuida de filmes novos
+const POLLING_SECONDS = 10; // Intervalo de polling em segundos
 const TWITCH_CHANNEL = process.env.REACT_APP_TWITCH_CHANNEL || 'roberth0202';
 
 const TMDB_GENRES = {
@@ -35,6 +35,7 @@ const getCertificationStyle = (cert) => {
 export default function TwitchMovieVoting() {
   const [ranking, setRanking] = useState([]);
   const [totalVotes, setTotalVotes] = useState(0);
+  const [pollCountdown, setPollCountdown] = useState(POLLING_SECONDS);
   const [lastVote, setLastVote] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [votingActive, setVotingActive] = useState(false);
@@ -225,7 +226,16 @@ export default function TwitchMovieVoting() {
 
   const startPolling = useCallback(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
-    intervalRef.current = setInterval(fetchRanking, POLLING_INTERVAL);
+    setPollCountdown(POLLING_SECONDS);
+    intervalRef.current = setInterval(() => {
+      setPollCountdown(prev => {
+        if (prev <= 1) {
+          fetchRanking();
+          return POLLING_SECONDS;
+        }
+        return prev - 1;
+      });
+    }, 1000);
   }, [fetchRanking]);
 
   useEffect(() => {
@@ -441,7 +451,7 @@ export default function TwitchMovieVoting() {
         {activeTab === 'votacao' && (<>
 
         {/* ── Stats ── */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-6">
+        <div className="grid grid-cols-4 gap-2 sm:gap-3 mb-6">
           <div className="bg-white/[0.03] rounded-lg p-3 sm:p-4 border border-white/5">
             <p className="text-[10px] sm:text-xs text-gray-500 mb-1">Votos</p>
             <p className="text-lg sm:text-2xl font-bold text-white">{totalVotes}</p>
@@ -455,6 +465,24 @@ export default function TwitchMovieVoting() {
             <p className="text-xs sm:text-sm font-semibold text-white truncate">
               {ranking.length > 0 ? ranking[0].name : '—'}
             </p>
+          </div>
+          <div className="bg-white/[0.03] rounded-lg p-3 sm:p-4 border border-white/5 flex flex-col items-center justify-center">
+            <p className="text-[10px] sm:text-xs text-gray-500 mb-1">Atualiza</p>
+            <div className="relative" style={{ width: 36, height: 36 }}>
+              <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                <circle cx="18" cy="18" r="15" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="3" />
+                <circle
+                  cx="18" cy="18" r="15" fill="none"
+                  stroke={pollCountdown <= 2 ? '#10b981' : '#6366f1'}
+                  strokeWidth="3" strokeLinecap="round"
+                  strokeDasharray={`${(pollCountdown / POLLING_SECONDS) * 94.25} 94.25`}
+                  style={{ transition: 'stroke-dasharray 0.8s ease, stroke 0.5s ease' }}
+                />
+              </svg>
+              <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white">
+                {pollCountdown}
+              </span>
+            </div>
           </div>
         </div>
 

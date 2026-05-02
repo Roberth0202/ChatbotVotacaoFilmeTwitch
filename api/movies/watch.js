@@ -2,6 +2,7 @@ const { ObjectId } = require('mongodb');
 const { connectToDatabase } = require('../_lib/mongodb');
 const { requireAdmin } = require('../_lib/auth');
 const { applyCors } = require('../_lib/cors');
+const { sanitizeInput } = require('../_lib/sanitize');
 
 module.exports = async function handler(req, res) {
   if (applyCors(req, res, 'POST, GET, DELETE, OPTIONS')) return;
@@ -24,7 +25,8 @@ module.exports = async function handler(req, res) {
       if (!requireAdmin(req, res)) return;
 
       const { movieName, markedBy, tmdbData } = req.body;
-      if (!movieName) {
+      const sanitizedName = sanitizeInput(movieName);
+      if (!sanitizedName || sanitizedName.length < 2) {
         return res.status(400).json({ error: 'movieName is required.' });
       }
 
@@ -58,8 +60,8 @@ module.exports = async function handler(req, res) {
       if (!requireAdmin(req, res)) return;
 
       const { id } = req.query;
-      if (!id) {
-        return res.status(400).json({ error: 'id is required' });
+      if (!id || !ObjectId.isValid(id)) {
+        return res.status(400).json({ error: 'Valid id is required' });
       }
 
       await watchedCollection.deleteOne({ _id: new ObjectId(id) });

@@ -2,6 +2,7 @@ const { connectToDatabase } = require('./_lib/mongodb');
 const { requireAdmin } = require('./_lib/auth');
 const { validateMovie } = require('./_lib/tmdb');
 const { applyCors } = require('./_lib/cors');
+const { sanitizeInput } = require('./_lib/sanitize');
 
 module.exports = async function handler(req, res) {
   if (applyCors(req, res, 'GET, POST, DELETE, OPTIONS')) return;
@@ -23,8 +24,9 @@ module.exports = async function handler(req, res) {
       if (!requireAdmin(req, res)) return;
 
       const { movieName, markedBy } = req.body || {};
+      const sanitizedMovie = sanitizeInput(movieName);
 
-      if (!movieName) {
+      if (!sanitizedMovie || sanitizedMovie.length < 2) {
         return res.status(400).json({ error: 'movieName is required' });
       }
 
@@ -69,8 +71,9 @@ module.exports = async function handler(req, res) {
       if (!requireAdmin(req, res)) return;
 
       const { movieName } = req.body || {};
+      const sanitizedMovie = sanitizeInput(movieName);
 
-      if (!movieName) {
+      if (!sanitizedMovie || sanitizedMovie.length < 2) {
         return res.status(400).json({ error: 'movieName is required' });
       }
 

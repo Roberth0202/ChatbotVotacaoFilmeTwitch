@@ -48,7 +48,7 @@ module.exports = async function handler(req, res) {
 
     if (!tokenResponse.ok) {
       console.error('Twitch Token Error:', tokenData);
-      return res.status(400).json({ error: 'Failed to authenticate with Twitch', details: tokenData });
+      return res.status(400).json({ error: 'Failed to authenticate with Twitch' });
     }
 
     const { access_token } = tokenData;
@@ -77,7 +77,7 @@ module.exports = async function handler(req, res) {
     const jwtToken = jwt.sign(
       { username: username, role: 'admin' },
       JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: '4h' }
     );
 
     return res.status(200).json({
