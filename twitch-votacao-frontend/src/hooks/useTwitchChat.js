@@ -5,6 +5,7 @@ export function useTwitchChat(channel) {
   const [chatConnected, setChatConnected] = useState(false);
   const [lastVoteEvent, setLastVoteEvent] = useState(null);
   const msgCountRef = useRef(0);
+  const voteCountRef = useRef(0);
 
   useEffect(() => {
     if (!channel) return;
@@ -30,50 +31,54 @@ export function useTwitchChat(channel) {
         setChatConnected(false);
       });
 
-    // Log de todos os eventos raw do IRC para debug
-    client.on('raw_message', (messageCloned, message) => {
-      if (msgCountRef.current < 3) {
-        console.log('[TMI RAW]', message.raw);
-      }
-    });
+    // Timer de resumo a cada 10s
+    const summaryTimer = setInterval(() => {
+      console.log(`[TMI RESUMO] ${msgCountRef.current} msgs recebidas | ${voteCountRef.current} votos detectados`);
+    }, 10000);
 
     // Escutar as mensagens do chat em tempo real
     client.on('message', (currentChannel, tags, message, self) => {
       msgCountRef.current++;
 
-      // Log das primeiras 5 mensagens para confirmar recebimento
-      if (msgCountRef.current <= 5) {
-        console.log(`[TMI MSG #${msgCountRef.current}] ${tags.username}: "${message.substring(0, 80)}" (self=${self})`);
+      const username = tags.username || '???';
+      const msg = (message || '').trim();
+
+      // === LOG AGRESSIVO: qualquer msg que começa com ! ===
+      if (msg.startsWith('!')) {
+        console.log(`⚡ [COMANDO] #${msgCountRef.current} ${username}: "${msg}" (self=${self})`);
       }
 
-      // Log a cada 100 mensagens para mostrar que continua recebendo
-      if (msgCountRef.current % 100 === 0) {
-        console.log(`[TMI] Total de mensagens recebidas: ${msgCountRef.current}`);
+      // === LOG: msgs do roberth0202 (o dono testando) ===
+      if (username.toLowerCase() === 'roberth0202') {
+        console.log(`👤 [ROBERTH0202] #${msgCountRef.current}: "${msg}" (self=${self})`);
+      }
+
+      // Log das primeiras 10 mensagens
+      if (msgCountRef.current <= 10) {
+        console.log(`[TMI MSG #${msgCountRef.current}] ${username}: "${msg.substring(0, 100)}" (self=${self})`);
+      }
+
+      // Log a cada 50 mensagens
+      if (msgCountRef.current % 50 === 0) {
+        console.log(`[TMI] Total: ${msgCountRef.current} msgs | ${voteCountRef.current} votos`);
       }
 
       if (self) return;
 
-      const username = tags.username;
-      const msg = message.trim();
-
       // Checa se o comando foi de voto
       if (msg.startsWith('!votar ') || msg.startsWith('!v ')) {
         const movieName = msg.startsWith('!v ') ? msg.slice(3).trim() : msg.slice(7).trim();
+        voteCountRef.current++;
 
-        console.log(`🎬 [VOTO DETECTADO] ${username} → "${movieName}" (msg original: "${msg}")`);
+        console.log(`🎬 [VOTO DETECTADO #${voteCountRef.current}] ${username} → "${movieName}" (msg: "${msg}")`);
         
         if (!movieName) {
           console.warn(`[TMI] Voto ignorado: nome do filme vazio (user: ${username})`);
           return;
         }
 
-        const event = {
-          username,
-          movieName,
-          timestamp: Date.now() 
-        };
-
-        console.log(`📤 [EMITINDO EVENTO]`, event);
+        const event = { username, movieName, timestamp: Date.now() };
+        console.log(`📤 [EMITINDO EVENTO]`, JSON.stringify(event));
         setLastVoteEvent(event);
       }
     });
@@ -94,6 +99,7 @@ export function useTwitchChat(channel) {
     });
 
     return () => {
+      clearInterval(summaryTimer);
       console.log(`[TMI] Desconectando do canal ${channel}...`);
       client.disconnect();
     };
