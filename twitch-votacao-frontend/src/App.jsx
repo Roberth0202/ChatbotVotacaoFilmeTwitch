@@ -5,7 +5,7 @@ import { useTwitchChat } from './hooks/useTwitchChat';
 const API_URL = process.env.REACT_APP_API_URL || '';
 const TMDB_IMAGE_URL = 'https://image.tmdb.org/t/p/w500';
 const POLLING_SECONDS = 10; // Intervalo de polling em segundos
-const TWITCH_CHANNEL = process.env.REACT_APP_TWITCH_CHANNEL || 'roberth0202';
+const TWITCH_CHANNEL = process.env.REACT_APP_TWITCH_CHANNEL || 'yayahuz';
 
 const TMDB_GENRES = {
   28: 'Ação', 12: 'Aventura', 16: 'Animação', 35: 'Comédia', 80: 'Crime',
@@ -307,7 +307,15 @@ export default function TwitchMovieVoting() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, movieName })
-    }).catch(err => console.error('Erro ao enviar voto pro BD:', err));
+    })
+      .then(res => {
+        if (!res.ok) {
+          return res.json().then(data => {
+            console.warn(`[Voto rejeitado] ${username}: ${data.error} (${data.code})`);
+          });
+        }
+      })
+      .catch(err => console.error('Erro de rede ao enviar voto:', err));
   }, [lastVoteEvent, fetchRanking]);
 
   return (
