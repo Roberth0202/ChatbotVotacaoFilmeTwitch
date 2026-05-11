@@ -65,6 +65,7 @@ module.exports = async function handler(req, res) {
           voteAverage: validation.voteAverage,
           certification: validation.certification,
           genreIds: validation.genreIds || [],
+          runtime: validation.runtime || null,
           votedAt: new Date().toISOString()
         }
       },

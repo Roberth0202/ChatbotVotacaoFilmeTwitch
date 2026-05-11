@@ -34,6 +34,19 @@ async function fetchCertification(movieId) {
   }
 }
 
+async function fetchRuntime(movieId) {
+  try {
+    const detailUrl = `${TMDB_BASE_URL}/movie/${movieId}?language=pt-BR`;
+    const response = await fetch(detailUrl, { headers: getTmdbHeaders() });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.runtime || null;
+  } catch (e) {
+    console.error('[TMDB] Error fetching runtime:', e.message);
+    return null;
+  }
+}
+
 async function validateMovie(movieName) {
   const TMDB_TOKEN = process.env.TMDB_API_KEY;
   if (!TMDB_TOKEN) {
@@ -63,7 +76,10 @@ async function validateMovie(movieName) {
 
     if (data.results && data.results.length > 0) {
       const movie = data.results[0];
-      const certification = await fetchCertification(movie.id);
+      const [certification, runtime] = await Promise.all([
+        fetchCertification(movie.id),
+        fetchRuntime(movie.id)
+      ]);
 
       const resultObj = {
         valid: true,
@@ -74,6 +90,7 @@ async function validateMovie(movieName) {
         overview: movie.overview || null,
         voteAverage: movie.vote_average || null,
         genreIds: movie.genre_ids || [],
+        runtime,
         certification
       };
 
@@ -121,7 +138,10 @@ async function searchMovies(query) {
     if (data.results && data.results.length > 0) {
       const results = await Promise.all(
         data.results.slice(0, 5).map(async (movie) => {
-          const certification = await fetchCertification(movie.id);
+          const [certification, runtime] = await Promise.all([
+            fetchCertification(movie.id),
+            fetchRuntime(movie.id)
+          ]);
           return {
             id: movie.id,
             title: movie.title,
@@ -130,6 +150,7 @@ async function searchMovies(query) {
             year: movie.release_date ? movie.release_date.split('-')[0] : null,
             overview: movie.overview || null,
             voteAverage: movie.vote_average || null,
+            runtime,
             certification
           };
         })

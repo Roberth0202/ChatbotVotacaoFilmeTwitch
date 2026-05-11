@@ -27,7 +27,8 @@ module.exports = async function handler(req, res) {
           overview: { $first: "$overview" },
           voteAverage: { $first: "$voteAverage" },
           certification: { $first: "$certification" },
-          genreIds: { $first: "$genreIds" }
+          genreIds: { $first: "$genreIds" },
+          runtime: { $first: "$runtime" }
         }
       },
       {
@@ -46,25 +47,49 @@ module.exports = async function handler(req, res) {
       overview: data.overview,
       voteAverage: data.voteAverage,
       certification: data.certification,
-      genreIds: data.genreIds || []
+      genreIds: data.genreIds || [],
+      runtime: data.runtime || null
     }));
 
-    // Auto-enriquecer votos sem gêneros (sem bloquear a resposta)
-    const moviesWithoutGenres = ranking.filter(m => !m.genreIds || m.genreIds.length === 0);
-    if (moviesWithoutGenres.length > 0 && process.env.TMDB_API_KEY) {
-      Promise.all(moviesWithoutGenres.map(async (movie) => {
+    // Auto-enriquecer votos sem gêneros ou sem runtime (sem bloquear a resposta)
+    const moviesToEnrich = ranking.filter(m => 
+      (!m.genreIds || m.genreIds.length === 0) || m.runtime === null || m.runtime === undefined
+    );
+    if (moviesToEnrich.length > 0 && process.env.TMDB_API_KEY) {
+      Promise.all(moviesToEnrich.map(async (movie) => {
         try {
           const searchUrl = `${TMDB_BASE_URL}/search/movie?query=${encodeURIComponent(movie.name)}&language=pt-BR`;
           const resp = await fetch(searchUrl, { headers: getTmdbHeaders() });
           if (resp.ok) {
             const data = await resp.json();
             if (data.results && data.results.length > 0) {
-              const genreIds = data.results[0].genre_ids || [];
-              if (genreIds.length > 0) {
-                movie.genreIds = genreIds;
+              const tmdbMovie = data.results[0];
+              const updateFields = {};
+
+              if (!movie.genreIds || movie.genreIds.length === 0) {
+                const genreIds = tmdbMovie.genre_ids || [];
+                if (genreIds.length > 0) {
+                  movie.genreIds = genreIds;
+                  updateFields.genreIds = genreIds;
+                }
+              }
+
+              if (movie.runtime === null || movie.runtime === undefined) {
+                const detailUrl = `${TMDB_BASE_URL}/movie/${tmdbMovie.id}?language=pt-BR`;
+                const detailResp = await fetch(detailUrl, { headers: getTmdbHeaders() });
+                if (detailResp.ok) {
+                  const detail = await detailResp.json();
+                  if (detail.runtime) {
+                    movie.runtime = detail.runtime;
+                    updateFields.runtime = detail.runtime;
+                  }
+                }
+              }
+
+              if (Object.keys(updateFields).length > 0) {
                 db.collection('votes').updateMany(
                   { movie: movie.name },
-                  { $set: { genreIds } }
+                  { $set: updateFields }
                 ).catch(() => {});
               }
             }

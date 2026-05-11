@@ -635,10 +635,14 @@ export default function TwitchMovieVoting() {
                       {movie.name}
                     </h3>
 
-                    {movie.year && (
-                      <div className="flex items-center gap-1 sm:gap-1.5 mb-1.5 sm:mb-3">
+                    {(movie.year || movie.runtime) && (
+                      <div className="flex items-center gap-1 sm:gap-1.5 mb-1.5 sm:mb-3 flex-wrap">
                         <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-gray-500" />
-                        <span className="text-[10px] sm:text-xs text-gray-500">{movie.year}</span>
+                        <span className="text-[10px] sm:text-xs text-gray-500">
+                          {movie.year || ''}
+                          {movie.year && movie.runtime ? ' • ' : ''}
+                          {movie.runtime ? `${Math.floor(movie.runtime / 60)}h ${movie.runtime % 60}min` : ''}
+                        </span>
                       </div>
                     )}
 
