@@ -1286,7 +1286,7 @@ export default function TwitchMovieVoting() {
       )}
 
       {/* ── Footer ── */}
-      <footer className="border-t border-white/5 mt-12">
+      <footer className="border-t border-white/5 ">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <p className="text-center text-xs text-gray-600">
             UzFlix © 2026  ·  Feito para a comunidade  ·  Powered by <span className="text-violet-400/70">Roberth0202</span>
