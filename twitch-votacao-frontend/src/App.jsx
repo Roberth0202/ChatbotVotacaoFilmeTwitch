@@ -738,10 +738,9 @@ export default function TwitchMovieVoting() {
                     {showDropdown && searchResults.length > 0 && (
                       <div className="absolute w-full mt-2 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-[100]">
                         {searchResults.map((movie) => {
-                          const movieYear = movie.release_date ? movie.release_date.substring(0, 4) : null;
                           const alreadyWatched = watchedMovies.some(w => 
                             (w.title || w.name || '').toLowerCase() === movie.title.toLowerCase() &&
-                            (!w.year || !movieYear || w.year === movieYear)
+                            (!w.year || !movie.year || w.year === movie.year)
                           );
                           return (
                           <div 
