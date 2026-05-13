@@ -544,7 +544,10 @@ export default function TwitchMovieVoting() {
             {ranking.filter(m => !activeFilterGenre || m.isNewLocally || (m.genreIds || []).includes(activeFilterGenre)).map((movie, index) => {
               const certStyle = getCertificationStyle(movie.certification);
               const percentage = totalVotes > 0 ? ((movie.count / totalVotes) * 100).toFixed(1) : 0;
-              const isWatched = watchedMovies.some(w => w.title.toLowerCase() === movie.name.toLowerCase());
+              const isWatched = watchedMovies.some(w =>
+                w.title.toLowerCase() === movie.name.toLowerCase() &&
+                (!w.year || !movie.year || w.year === movie.year)
+              );
 
               return (
                 <div
@@ -735,7 +738,11 @@ export default function TwitchMovieVoting() {
                     {showDropdown && searchResults.length > 0 && (
                       <div className="absolute w-full mt-2 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-[100]">
                         {searchResults.map((movie) => {
-                          const alreadyWatched = watchedMovies.some(w => (w.title || w.name || '').toLowerCase() === movie.title.toLowerCase());
+                          const movieYear = movie.release_date ? movie.release_date.substring(0, 4) : null;
+                          const alreadyWatched = watchedMovies.some(w => 
+                            (w.title || w.name || '').toLowerCase() === movie.title.toLowerCase() &&
+                            (!w.year || !movieYear || w.year === movieYear)
+                          );
                           return (
                           <div 
                             key={movie.id}
@@ -1168,7 +1175,10 @@ export default function TwitchMovieVoting() {
               ) : (
                 <div className="space-y-2">
                   {ranking.slice(0, 10).map((movie, index) => {
-                    const alreadyWatched = watchedMovies.some(w => (w.title || w.name || '').toLowerCase() === movie.name.toLowerCase());
+                    const alreadyWatched = watchedMovies.some(w => 
+                      (w.title || w.name || '').toLowerCase() === movie.name.toLowerCase() &&
+                      (!w.year || !movie.year || w.year === movie.year)
+                    );
                     return (
                     <div key={movie.name} className="flex flex-col sm:flex-row items-center justify-between bg-white/[0.01] p-3 rounded-xl hover:bg-white/[0.03] transition-colors border border-transparent hover:border-white/5 gap-4">
                       <div className="flex items-center gap-4 w-full sm:w-auto">
