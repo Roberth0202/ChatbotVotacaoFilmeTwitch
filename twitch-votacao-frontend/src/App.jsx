@@ -32,6 +32,85 @@ const getCertificationStyle = (cert) => {
   return { bg: 'bg-gray-600', text: cert };
 };
 
+// ── CONFIRM MODAL COMPONENT ──
+function ConfirmModal({ isOpen, title, message, type, onConfirm, onCancel }) {
+  if (!isOpen) return null;
+  const isAlert = type === 'alert' || type === 'error';
+  const isError = type === 'error';
+
+  return (
+    <div 
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+      style={{ animation: 'modalOverlayIn 200ms ease-out forwards' }}
+    >
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={isAlert ? onConfirm : onCancel} />
+      <div 
+        className="relative w-full max-w-sm bg-[#1a1a1a]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
+        style={{ animation: 'modalContentIn 250ms cubic-bezier(0.16, 1, 0.3, 1) forwards' }}
+      >
+        {/* Accent bar */}
+        <div className={`h-1 w-full ${
+          isError ? 'bg-gradient-to-r from-red-500 via-red-400 to-red-500' 
+          : isAlert ? 'bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500' 
+          : 'bg-gradient-to-r from-violet-500 via-violet-400 to-violet-500'
+        }`} />
+        
+        <div className="p-6">
+          {/* Icon */}
+          <div className="flex justify-center mb-4">
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl ${
+              isError ? 'bg-red-500/15 text-red-400' 
+              : isAlert ? 'bg-amber-500/15 text-amber-400' 
+              : 'bg-violet-500/15 text-violet-400'
+            }`}>
+              {isError ? '✕' : isAlert ? '!' : '?'}
+            </div>
+          </div>
+          
+          {/* Title */}
+          <h3 className="text-white font-semibold text-center text-base mb-2">{title}</h3>
+          
+          {/* Message */}
+          <p className="text-gray-400 text-sm text-center leading-relaxed mb-6">{message}</p>
+          
+          {/* Actions */}
+          <div className={`flex gap-3 ${isAlert ? 'justify-center' : ''}`}>
+            {!isAlert && (
+              <button
+                onClick={onCancel}
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-gray-400 bg-white/5 border border-white/10 hover:bg-white/10 hover:text-white transition-all duration-200"
+              >
+                Cancelar
+              </button>
+            )}
+            <button
+              onClick={onConfirm}
+              className={`${isAlert ? 'px-8' : 'flex-1'} px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                isError ? 'bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30'
+                : isAlert ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30'
+                : 'bg-violet-500/20 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30'
+              }`}
+            >
+              {isAlert ? 'Entendi' : 'Confirmar'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes modalOverlayIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes modalContentIn {
+          from { opacity: 0; transform: scale(0.95) translateY(8px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 export default function TwitchMovieVoting() {
   const [ranking, setRanking] = useState([]);
   const [totalVotes, setTotalVotes] = useState(0);
@@ -56,6 +135,20 @@ export default function TwitchMovieVoting() {
   const [isMigrating, setIsMigrating] = useState(false);
   const [authError, setAuthError] = useState(null);
   const [guideOpen, setGuideOpen] = useState(false);
+
+  // Modal state
+  const [modalState, setModalState] = useState({ isOpen: false, title: '', message: '', type: 'confirm', resolve: null });
+  const showModal = useCallback((message, { title = '', type = 'confirm' } = {}) => {
+    return new Promise((resolve) => {
+      setModalState({
+        isOpen: true,
+        title: title || (type === 'error' ? 'Erro' : type === 'alert' ? 'Aviso' : 'Confirmação'),
+        message,
+        type,
+        resolve
+      });
+    });
+  }, []);
 
   // Security: Validate stored token with backend on mount
   useEffect(() => {
@@ -705,11 +798,11 @@ export default function TwitchMovieVoting() {
                       fetchRanking();
                     } else {
                       const err = await res.json();
-                      alert(`Erro: ${err.error}`);
+                      showModal(err.error || 'Erro desconhecido', { type: 'error' });
                     }
                   } catch (e) {
                     console.error(e);
-                    alert('Erro de conexão ao salvar.');
+                    showModal('Erro de conexão ao salvar.', { type: 'error' });
                   }
                 }} className="flex flex-col sm:flex-row gap-3 relative">
                   
@@ -771,7 +864,7 @@ export default function TwitchMovieVoting() {
                                   fetchRanking();
                                 } else {
                                   const err = await res.json();
-                                  alert(`Erro: ${err.error}`);
+                                  showModal(err.error || 'Erro desconhecido', { type: 'error' });
                                 }
                               } catch (e) {
                                 console.error('Erro ao adicionar via dropdown', e);
@@ -859,7 +952,8 @@ export default function TwitchMovieVoting() {
                             {isAdmin && (
                               <button
                                 onClick={async () => {
-                                  if (!window.confirm(`Deseja remover ${movie.title || movie.name} dos assistidos?`)) return;
+                                  const confirmed = await showModal(`Deseja remover "${movie.title || movie.name}" dos assistidos?`, { title: 'Remover filme' });
+                                  if (!confirmed) return;
                                   // Optimistic UI: remove imediatamente da lista
                                   setWatchedMovies(prev => prev.filter(m => m.id !== movie.id));
                                   try {
@@ -872,11 +966,11 @@ export default function TwitchMovieVoting() {
                                     if (!res.ok) {
                                       // Revert: adiciona de volta se falhar
                                       setWatchedMovies(prev => [...prev, movie].sort((a, b) => new Date(b.markedAt) - new Date(a.markedAt)));
-                                      alert('Erro ao remover.');
+                                      showModal('Erro ao remover.', { type: 'error' });
                                     }
                                   } catch (e) {
                                     setWatchedMovies(prev => [...prev, movie].sort((a, b) => new Date(b.markedAt) - new Date(a.markedAt)));
-                                    alert('Erro de conexão ao remover.');
+                                    showModal('Erro de conexão ao remover.', { type: 'error' });
                                   }
                                 }}
                                 className="shrink-0 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-[10px] sm:text-xs font-medium px-2 py-1 rounded border border-red-500/20 transition-colors"
@@ -1206,7 +1300,7 @@ export default function TwitchMovieVoting() {
                             } else {
                               fetchRanking();
                               const err = await res.json();
-                              alert(err.error || 'Erro ao transferir.');
+                              showModal(err.error || 'Erro ao transferir.', { type: 'error' });
                             }
                           } catch (e) {
                             fetchRanking();
@@ -1248,7 +1342,7 @@ export default function TwitchMovieVoting() {
               onClick={() => {
                 const clientId = process.env.REACT_APP_TWITCH_CLIENT_ID;
                 if (!clientId) {
-                  alert('Falta o REACT_APP_TWITCH_CLIENT_ID no .env do frontend.');
+                  showModal('Falta o REACT_APP_TWITCH_CLIENT_ID no .env do frontend.', { type: 'error' });
                   return;
                 }
                 const redirectUri = window.location.origin; // ex: http://localhost:3000
@@ -1302,6 +1396,21 @@ export default function TwitchMovieVoting() {
           </p>
         </div>
       </footer>
+      {/* ── Custom Modal ── */}
+      <ConfirmModal
+        isOpen={modalState.isOpen}
+        title={modalState.title}
+        message={modalState.message}
+        type={modalState.type}
+        onConfirm={() => {
+          modalState.resolve?.(true);
+          setModalState(prev => ({ ...prev, isOpen: false }));
+        }}
+        onCancel={() => {
+          modalState.resolve?.(false);
+          setModalState(prev => ({ ...prev, isOpen: false }));
+        }}
+      />
     </div>
   );
 }
