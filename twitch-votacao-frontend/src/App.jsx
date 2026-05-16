@@ -132,6 +132,7 @@ export default function TwitchMovieVoting() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedGenre, setSelectedGenre] = useState(null);
   const [activeFilterGenre, setActiveFilterGenre] = useState(null);
+  const [hideWatched, setHideWatched] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
   const [authError, setAuthError] = useState(null);
   const [guideOpen, setGuideOpen] = useState(false);
@@ -355,8 +356,15 @@ export default function TwitchMovieVoting() {
   // Efeito trigado sempre que o WebSocket recebe um voto (!votar ou !v) na Twitch
   useEffect(() => {
     if (!lastVoteEvent) return;
+    if (!votingActive) return; // Ignora votos do chat quando a votação está pausada
 
     const { username, movieName } = lastVoteEvent;
+
+    // Ignora votos para filmes já assistidos (evita flicker)
+    const isAlreadyWatched = watchedMovies.some(w =>
+      (w.title || w.name || '').toLowerCase() === movieName.toLowerCase()
+    );
+    if (isAlreadyWatched) return;
 
     // 1. Atualização Otimista Visual (Instantânea para todos)
     setLastVote({
@@ -409,7 +417,7 @@ export default function TwitchMovieVoting() {
         }
       })
       .catch(err => console.error('Erro de rede ao enviar voto:', err));
-  }, [lastVoteEvent, fetchRanking]);
+  }, [lastVoteEvent, fetchRanking, votingActive, watchedMovies]);
 
   return (
     <div className="min-h-screen bg-[#0d0b1a] text-white font-sans overflow-x-hidden">
@@ -624,6 +632,28 @@ export default function TwitchMovieVoting() {
               ✕ Limpar
             </button>
           )}
+
+          {/* Separador */}
+          <div className="w-px h-5 bg-white/10 mx-1 hidden sm:block" />
+
+          {/* Toggle: Esconder Assistidos */}
+          <button
+            onClick={() => setHideWatched(prev => !prev)}
+            className={`flex items-center gap-1.5 text-[11px] sm:text-xs px-2.5 py-1.5 rounded-lg border transition-all duration-200 cursor-pointer select-none ${
+              hideWatched
+                ? 'bg-violet-500/20 border-violet-500/40 text-violet-300'
+                : 'bg-white/5 border-white/10 text-gray-500 hover:text-gray-300 hover:border-white/20'
+            }`}
+          >
+            <div className={`w-7 h-4 rounded-full relative transition-colors duration-200 ${
+              hideWatched ? 'bg-violet-500/50' : 'bg-white/10'
+            }`}>
+              <div className={`absolute top-0.5 w-3 h-3 rounded-full transition-all duration-200 ${
+                hideWatched ? 'left-3.5 bg-violet-300' : 'left-0.5 bg-gray-500'
+              }`} />
+            </div>
+            Esconder vistos
+          </button>
         </div>
 
         {/* ── Ranking de Filmes ── */}
@@ -634,7 +664,11 @@ export default function TwitchMovieVoting() {
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3">
-            {ranking.filter(m => !activeFilterGenre || m.isNewLocally || (m.genreIds || []).includes(activeFilterGenre)).map((movie, index) => {
+            {ranking.filter(m => {
+              if (activeFilterGenre && !m.isNewLocally && !(m.genreIds || []).includes(activeFilterGenre)) return false;
+              if (hideWatched && watchedMovies.some(w => (w.title || '').toLowerCase() === m.name.toLowerCase() && (!w.year || !m.year || w.year === m.year))) return false;
+              return true;
+            }).map((movie, index) => {
               const certStyle = getCertificationStyle(movie.certification);
               const percentage = totalVotes > 0 ? ((movie.count / totalVotes) * 100).toFixed(1) : 0;
               const isWatched = watchedMovies.some(w =>

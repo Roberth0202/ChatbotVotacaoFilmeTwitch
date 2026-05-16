@@ -51,6 +51,17 @@ module.exports = async function handler(req, res) {
     }
 
     const movieTitle = validation.title || sanitizedMovie;
+
+    // Check if movie is already in watched list
+    const alreadyWatched = await db.collection('watched').findOne({
+      name: { $regex: new RegExp(`^${movieTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+    });
+    if (alreadyWatched) {
+      return res.status(400).json({
+        error: `"${movieTitle}" já foi assistido`,
+        code: 'ALREADY_WATCHED'
+      });
+    }
     const previousVote = previousVoteDoc?.movie || null;
 
     await db.collection('votes').updateOne(
