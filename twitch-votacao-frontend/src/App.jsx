@@ -360,12 +360,6 @@ export default function TwitchMovieVoting() {
 
     const { username, movieName } = lastVoteEvent;
 
-    // Ignora votos para filmes já assistidos (evita flicker)
-    const isAlreadyWatched = watchedMovies.some(w =>
-      (w.title || w.name || '').toLowerCase() === movieName.toLowerCase()
-    );
-    if (isAlreadyWatched) return;
-
     // 1. Atualização Otimista Visual (Instantânea para todos)
     setLastVote({
       username,
@@ -417,7 +411,8 @@ export default function TwitchMovieVoting() {
         }
       })
       .catch(err => console.error('Erro de rede ao enviar voto:', err));
-  }, [lastVoteEvent, fetchRanking, votingActive, watchedMovies]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastVoteEvent, votingActive]);
 
   return (
     <div className="min-h-screen bg-[#0d0b1a] text-white font-sans overflow-x-hidden">
