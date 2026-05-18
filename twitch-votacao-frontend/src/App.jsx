@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Film, TrendingUp, Star, Clock, Search, Loader2 } from 'lucide-react';
 import { useTwitchChat } from './hooks/useTwitchChat';
+import GuidedTour from './components/GuidedTour';
 
 const API_URL = process.env.REACT_APP_API_URL || '';
 const TMDB_IMAGE_URL = 'https://image.tmdb.org/t/p/w500';
@@ -136,6 +137,8 @@ export default function TwitchMovieVoting() {
   const [isMigrating, setIsMigrating] = useState(false);
   const [authError, setAuthError] = useState(null);
   const [guideOpen, setGuideOpen] = useState(false);
+  const [showTour, setShowTour] = useState(true);
+  const [tourInstant, setTourInstant] = useState(false);
 
   // Modal state
   const [modalState, setModalState] = useState({ isOpen: false, title: '', message: '', type: 'confirm', resolve: null });
@@ -435,7 +438,7 @@ export default function TwitchMovieVoting() {
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3">
-              <div className="inline-flex items-center gap-2 bg-white/5 border border-white/5 rounded-full px-3 py-1.5">
+              <div id="tour-chat-status" className="inline-flex items-center gap-2 bg-white/5 border border-white/5 rounded-full px-3 py-1.5">
                 <div className={`w-2 h-2 rounded-full ${chatConnected ? 'bg-cyan-400 motion-safe:animate-pulse' : 'bg-red-500'}`} />
                 <span className="text-xs text-gray-400 hidden sm:inline">
                   {chatConnected ? 'Chat Conectado' : 'Sem Chat'}
@@ -462,7 +465,7 @@ export default function TwitchMovieVoting() {
                   {isConnected ? 'API Online' : 'API Offline'}
                 </span>
               </div>
-              <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 ${
+              <div id="tour-voting-status" className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 ${
                 votingActive
                   ? 'bg-violet-500/15 border border-violet-500/20'
                   : 'bg-white/5 border border-white/5'
@@ -472,6 +475,18 @@ export default function TwitchMovieVoting() {
                   {votingActive ? 'Aberta' : 'Fechada'}
                 </span>
               </div>
+              <button
+                onClick={() => {
+                  localStorage.removeItem('uzflix-tour-completed');
+                  setTourInstant(true);
+                  setShowTour(true);
+                }}
+                className="inline-flex items-center gap-1 bg-white/5 border border-white/5 rounded-full px-2.5 py-1.5 text-gray-500 hover:text-violet-300 hover:border-violet-500/20 hover:bg-violet-500/10 transition-all duration-200 cursor-pointer"
+                title="Ver tutorial do site"
+              >
+                <span className="text-xs">❓</span>
+                <span className="text-[10px] hidden sm:inline">Tour</span>
+              </button>
             </div>
           </div>
         </div>
@@ -480,7 +495,7 @@ export default function TwitchMovieVoting() {
       <main className="container mx-auto px-3 sm:px-6 lg:px-8 pb-8 sm:pb-12 overflow-x-hidden">
 
         {/* ── Legenda de Faixas Etárias ── */}
-        <div className="-mx-3 sm:-mx-6 lg:-mx-8 bg-white/5  rounded-xl sm:rounded-2xl p-4 px-5 sm:p-5 sm:px-8 lg:px-12 border border-white/10 mb-4 sm:mb-6">
+        <div id="tour-age-rating" className="-mx-3 sm:-mx-6 lg:-mx-8 bg-white/5  rounded-xl sm:rounded-2xl p-4 px-5 sm:p-5 sm:px-8 lg:px-12 border border-white/10 mb-4 sm:mb-6">
           <h3 className="text-xs sm:text-sm font-semibold text-gray-300 mb-3 text-center">📋 Classificação Indicativa</h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
             <div className="flex items-start gap-2 bg-green-500/10 rounded-lg p-2">
@@ -511,7 +526,7 @@ export default function TwitchMovieVoting() {
         </div>
 
         {/* ── Abas ── */}
-        <div className="flex gap-1 mb-6 bg-transparent p-1 rounded-xl border border-white/[0.06]">
+        <div id="tour-tabs" className="flex gap-1 mb-6 bg-transparent p-1 rounded-xl border border-white/[0.06]">
           <button
             onClick={() => setActiveTab('votacao')}
             className={`flex-1 py-2 rounded-md font-medium text-sm transition-all outline-none focus:outline-none focus:ring-0 border ${
@@ -549,7 +564,7 @@ export default function TwitchMovieVoting() {
         {activeTab === 'votacao' && (<>
 
         {/* ── Stats ── */}
-        <div className="grid grid-cols-4 gap-2 sm:gap-3 mb-6">
+        <div id="tour-stats" className="grid grid-cols-4 gap-2 sm:gap-3 mb-6">
           <div className="bg-white/[0.03] rounded-lg p-3 sm:p-4 border border-white/5">
             <p className="text-[10px] sm:text-xs text-gray-500 mb-1">Votos</p>
             <p className="text-lg sm:text-2xl font-bold text-white">{totalVotes}</p>
@@ -597,7 +612,7 @@ export default function TwitchMovieVoting() {
         )}
 
         {/* ── Filtro de Gênero ── */}
-        <div className="mb-4 flex items-center gap-2">
+        <div id="tour-filters" className="mb-4 flex items-center gap-2">
           <select
             value={selectedGenre || ''}
             onChange={(e) => {
@@ -658,7 +673,7 @@ export default function TwitchMovieVoting() {
             <p className="text-gray-500 text-sm">Aguardando votos...</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3">
+          <div id="tour-ranking" className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3">
             {ranking.filter(m => {
               if (activeFilterGenre && !m.isNewLocally && !(m.genreIds || []).includes(activeFilterGenre)) return false;
               if (hideWatched && watchedMovies.some(w => (w.title || '').toLowerCase() === m.name.toLowerCase() && (!w.year || !m.year || w.year === m.year))) return false;
@@ -674,23 +689,25 @@ export default function TwitchMovieVoting() {
               return (
                 <div
                   key={movie.name}
-                  className={`group relative bg-white/[0.03] rounded-lg border overflow-hidden motion-safe:transition-all motion-safe:duration-300 motion-safe:hover:border-violet-500/30 ${
+                  id={index === 0 ? 'tour-ranking-card' : undefined}
+                  className={`group relative bg-white/[0.03] rounded-lg border overflow-hidden motion-safe:transition-all motion-safe:duration-300 ${
                     index === 0
-                      ? 'border-violet-500/30'
-                      : 'border-white/5'
+                      ? 'border-amber-400/50 shadow-[0_0_20px_rgba(251,191,36,0.15)] motion-safe:hover:border-amber-400/70 motion-safe:hover:shadow-[0_0_30px_rgba(251,191,36,0.25)]'
+                      : 'border-white/5 motion-safe:hover:border-violet-500/30'
                   }`}
+                  style={index === 0 ? { background: 'linear-gradient(135deg, rgba(251,191,36,0.06) 0%, rgba(245,158,11,0.03) 50%, rgba(255,255,255,0.02) 100%)' } : undefined}
                 >
                   {/* Badge de posição */}
                   <div className={`absolute top-2 left-2 z-10 w-7 h-7 sm:w-8 sm:h-8 rounded-md flex items-center justify-center text-xs sm:text-sm font-bold ${
                     index === 0
-                      ? 'bg-violet-500 text-white'
+                      ? 'bg-gradient-to-br from-amber-400 to-yellow-500 text-black shadow-lg shadow-amber-500/30'
                       : index === 1
                       ? 'bg-white/15 text-gray-300'
                       : index === 2
                       ? 'bg-white/10 text-gray-400'
                       : 'bg-white/5 text-gray-500'
                   }`}>
-                    {index + 1}
+                    {index === 0 ? '👑' : index + 1}
                   </div>
 
                   {/* Badge de classificação indicativa */}
@@ -747,7 +764,9 @@ export default function TwitchMovieVoting() {
                       {/* Barra de progresso */}
                       <div className="mt-1.5 h-1 bg-white/10 rounded-full overflow-hidden">
                         <div
-                          className="h-full rounded-full bg-violet-500 motion-safe:transition-all motion-safe:duration-1000 ease-out"
+                          className={`h-full rounded-full motion-safe:transition-all motion-safe:duration-1000 ease-out ${
+                            index === 0 ? 'bg-gradient-to-r from-amber-400 to-yellow-500' : 'bg-violet-500'
+                          }`}
                           style={{ width: `${percentage}%` }}
                         />
                       </div>
@@ -1440,6 +1459,8 @@ export default function TwitchMovieVoting() {
           setModalState(prev => ({ ...prev, isOpen: false }));
         }}
       />
+      {/* ── Guided Tour ── */}
+      {showTour && <GuidedTour instant={tourInstant} onComplete={() => { setShowTour(false); setTourInstant(false); }} />}
     </div>
   );
 }
