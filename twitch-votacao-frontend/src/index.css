@@ -95,3 +95,112 @@ select option {
   background: #1a1028;
   color: #fff;
 }
+
+/* ── Bracket / Versus Animations ── */
+@keyframes screenShake {
+  0%, 100% { transform: translateX(0); }
+  10% { transform: translateX(-3px) translateY(1px); }
+  20% { transform: translateX(3px) translateY(-1px); }
+  30% { transform: translateX(-2px); }
+  40% { transform: translateX(2px) translateY(1px); }
+  50% { transform: translateX(-1px); }
+  60% { transform: translateX(1px); }
+  70% { transform: translateX(-2px) translateY(-1px); }
+  80% { transform: translateX(2px); }
+  90% { transform: translateX(-1px) translateY(1px); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { 
+    filter: drop-shadow(0 0 8px currentColor);
+    transform: scale(1);
+  }
+  50% { 
+    filter: drop-shadow(0 0 20px currentColor);
+    transform: scale(1.05);
+  }
+}
+
+@keyframes expandWinner {
+  from { flex: 1; }
+  to { flex: 2; }
+}
+
+@keyframes shrinkLoser {
+  from { flex: 1; opacity: 1; }
+  to { flex: 0.5; opacity: 0.3; }
+}
+
+@keyframes counterPulse {
+  0% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.4); opacity: 1; }
+  100% { transform: scale(1); opacity: 0.8; }
+}
+
+@keyframes versusSlideLeft {
+  from { transform: translateX(-100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes versusSlideRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes vsBounce {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  25% { transform: scale(1.2) rotate(-5deg); }
+  50% { transform: scale(1.1) rotate(5deg); }
+  75% { transform: scale(1.15) rotate(-3deg); }
+}
+
+@keyframes urgentPulse {
+  0%, 100% { 
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+    border-color: rgba(239, 68, 68, 0.5);
+  }
+  50% { 
+    box-shadow: 0 0 30px 10px rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 1);
+  }
+}
+
+@keyframes championReveal {
+  0% { transform: scale(0.5); opacity: 0; filter: blur(10px); }
+  60% { transform: scale(1.1); opacity: 1; filter: blur(0); }
+  100% { transform: scale(1); opacity: 1; filter: blur(0); }
+}
+
+@keyframes glowPulse {
+  0%, 100% { text-shadow: 0 0 10px rgba(255, 215, 0, 0.5), 0 0 30px rgba(255, 215, 0, 0.3); }
+  50% { text-shadow: 0 0 20px rgba(255, 215, 0, 0.8), 0 0 60px rgba(255, 215, 0, 0.5), 0 0 100px rgba(255, 215, 0, 0.3); }
+}
+
+.animate-screenShake {
+  animation: screenShake 0.5s ease-in-out;
+}
+
+.animate-pulseGlow {
+  animation: pulseGlow 1.5s ease-in-out infinite;
+}
+
+.animate-counterPulse {
+  animation: counterPulse 0.8s ease-in-out infinite;
+}
+
+.animate-vsBounce {
+  animation: vsBounce 2s ease-in-out infinite;
+}
+
+.animate-urgentPulse {
+  animation: urgentPulse 0.8s ease-in-out infinite;
+}
+
+.animate-championReveal {
+  animation: championReveal 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-glowPulse {
+  animation: glowPulse 2s ease-in-out infinite;
+}
+

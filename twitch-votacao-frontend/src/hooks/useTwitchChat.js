@@ -4,6 +4,7 @@ import tmi from 'tmi.js';
 export function useTwitchChat(channel) {
   const [chatConnected, setChatConnected] = useState(false);
   const [lastVoteEvent, setLastVoteEvent] = useState(null);
+  const [lastBracketVote, setLastBracketVote] = useState(null);
 
   useEffect(() => {
     if (!channel) return;
@@ -36,6 +37,12 @@ export function useTwitchChat(channel) {
 
         setLastVoteEvent({ username, movieName, timestamp: Date.now() });
       }
+
+      // Bracket votes: !1 or !2
+      if (msg === '!1' || msg === '!2') {
+        const choice = parseInt(msg.slice(1));
+        setLastBracketVote({ username, choice, timestamp: Date.now() });
+      }
     });
 
     client.on('disconnected', () => setChatConnected(false));
@@ -46,5 +53,6 @@ export function useTwitchChat(channel) {
     };
   }, [channel]);
 
-  return { chatConnected, lastVoteEvent };
+  return { chatConnected, lastVoteEvent, lastBracketVote };
 }
+

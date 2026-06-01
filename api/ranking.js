@@ -111,7 +111,9 @@ module.exports = async function handler(req, res) {
       ranking,
       totalVotes,
       votingActive,
-      watchedMovies: cleanWatched
+      watchedMovies: cleanWatched,
+      mode: session?.mode || 'general',
+      bracket: session?.bracket || null
     });
   } catch (error) {
     console.error('[API /ranking] Error:', error);

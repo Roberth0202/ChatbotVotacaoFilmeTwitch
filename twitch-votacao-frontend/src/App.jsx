@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Film, TrendingUp, Star, Clock, Search, Loader2 } from 'lucide-react';
 import { useTwitchChat } from './hooks/useTwitchChat';
 import GuidedTour from './components/GuidedTour';
+import VersusScreen from './components/VersusScreen';
 
 const API_URL = process.env.REACT_APP_API_URL || '';
 const TMDB_IMAGE_URL = 'https://image.tmdb.org/t/p/w500';
@@ -140,6 +141,12 @@ export default function TwitchMovieVoting() {
   const [showTour, setShowTour] = useState(true);
   const [tourInstant, setTourInstant] = useState(false);
 
+  // Bracket / Mata-Mata state
+  const [bracketMode, setBracketMode] = useState('general');
+  const [bracketData, setBracketData] = useState(null);
+  const [bracketRoundDuration, setBracketRoundDuration] = useState(60);
+  const [isStartingBracket, setIsStartingBracket] = useState(false);
+
   // Modal state
   const [modalState, setModalState] = useState({ isOpen: false, title: '', message: '', type: 'confirm', resolve: null });
   const showModal = useCallback((message, { title = '', type = 'confirm' } = {}) => {
@@ -200,7 +207,7 @@ export default function TwitchMovieVoting() {
     }
   };
   // Hook da Twitch para WebSockets
-  const { chatConnected, lastVoteEvent } = useTwitchChat(TWITCH_CHANNEL);
+  const { chatConnected, lastVoteEvent, lastBracketVote } = useTwitchChat(TWITCH_CHANNEL);
 
   // Effect para a busca automática ao digitar
   useEffect(() => {
@@ -277,6 +284,10 @@ export default function TwitchMovieVoting() {
         setVotingActive(data.votingActive || false);
       }
       if (data.watchedMovies) setWatchedMovies(data.watchedMovies);
+
+      // Bracket data
+      setBracketMode(data.mode || 'general');
+      setBracketData(data.bracket || null);
 
     } catch (error) {
       setIsConnected(false);
@@ -416,6 +427,121 @@ export default function TwitchMovieVoting() {
       .catch(err => console.error('Erro de rede ao enviar voto:', err));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastVoteEvent, votingActive]);
+
+  // ── Bracket Vote from Twitch Chat (optimistic !1/!2) ──
+  useEffect(() => {
+    if (!lastBracketVote) return;
+    if (bracketMode !== 'bracket') return;
+
+    const { username, choice } = lastBracketVote;
+
+    // Optimistic local update via VersusScreen exposed callback
+    if (window.__versusHandleBracketVote) {
+      window.__versusHandleBracketVote(choice);
+    }
+
+    // Persist to backend
+    fetch(`${API_URL}/api/vote-bracket`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, choice })
+    }).catch(err => console.error('Bracket vote error:', err));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastBracketVote, bracketMode]);
+
+  // Bracket admin actions
+  const handleStartBracket = useCallback(async () => {
+    if (ranking.length < 4) return;
+    setIsStartingBracket(true);
+    controlInFlightRef.current = Date.now();
+    const top4 = ranking.slice(0, 4);
+    const movies = top4.map(m => m.name);
+    const movieData = {};
+    for (const m of top4) {
+      movieData[m.name] = {
+        posterPath: m.posterPath,
+        year: m.year,
+        voteAverage: m.voteAverage,
+        overview: m.overview,
+        certification: m.certification
+      };
+    }
+    try {
+      const res = await fetch(`${API_URL}/api/control`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        },
+        body: JSON.stringify({ action: 'start-bracket', movies, movieData, roundDuration: bracketRoundDuration })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setBracketMode('bracket');
+        setBracketData(data.bracket || null);
+        setVotingActive(true);
+        setActiveTab('votacao');
+        fetchRanking();
+      } else {
+        const err = await res.json();
+        showModal(err.error || 'Erro ao iniciar mata-mata. A API pode estar desatualizada.', { type: 'error' });
+      }
+    } catch (e) {
+      console.error('Error starting bracket:', e);
+      showModal('Erro de conexão ao iniciar mata-mata.', { type: 'error' });
+    } finally {
+      setIsStartingBracket(false);
+    }
+  }, [ranking, bracketRoundDuration, fetchRanking, showModal]);
+
+  const handleNextRound = useCallback(async () => {
+    controlInFlightRef.current = Date.now();
+    try {
+      const res = await fetch(`${API_URL}/api/control`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        },
+        body: JSON.stringify({ action: 'next-round' })
+      });
+      if (res.ok) {
+        setTimeout(() => fetchRanking(), 1000);
+      } else {
+        const err = await res.json();
+        showModal(err.error || 'Erro ao avançar round.', { type: 'error' });
+      }
+    } catch (e) {
+      console.error('Error advancing round:', e);
+      showModal('Erro de conexão ao avançar round.', { type: 'error' });
+    }
+  }, [fetchRanking, showModal]);
+
+  const handleEndBracket = useCallback(async () => {
+    controlInFlightRef.current = Date.now();
+    try {
+      const res = await fetch(`${API_URL}/api/control`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        },
+        body: JSON.stringify({ action: 'end-bracket' })
+      });
+      if (res.ok) {
+        setBracketMode('general');
+        setBracketData(null);
+        setVotingActive(false);
+        fetchRanking();
+      } else {
+        const err = await res.json();
+        showModal(err.error || 'Erro ao encerrar mata-mata.', { type: 'error' });
+      }
+    } catch (e) {
+      console.error('Error ending bracket:', e);
+      showModal('Erro de conexão ao encerrar mata-mata.', { type: 'error' });
+    }
+  }, [fetchRanking, showModal]);
 
   return (
     <div className="min-h-screen bg-[#0d0b1a] text-white font-sans overflow-x-hidden">
@@ -561,7 +687,20 @@ export default function TwitchMovieVoting() {
           )}
         </div>
 
-        {activeTab === 'votacao' && (<>
+        {activeTab === 'votacao' && bracketMode === 'bracket' && bracketData && (
+          <div className="motion-safe:animate-fadeIn">
+            <VersusScreen
+              bracket={bracketData}
+              ranking={ranking}
+              onNextRound={handleNextRound}
+              onEndBracket={handleEndBracket}
+              isAdmin={isAdmin}
+              API_URL={API_URL}
+            />
+          </div>
+        )}
+
+        {activeTab === 'votacao' && bracketMode !== 'bracket' && (<>
 
         {/* ── Stats ── */}
         <div id="tour-stats" className="grid grid-cols-4 gap-2 sm:gap-3 mb-6">
@@ -1165,6 +1304,89 @@ export default function TwitchMovieVoting() {
               >
                 {isMigrating ? '🔄 Atualizando Gêneros...' : '🔄 Atualizar Gêneros dos Votos'}
               </button>
+            </div>
+
+            {/* ── MATA-MATA / BRACKET ── */}
+            <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-6 sm:p-8">
+              <h3 className="text-gray-300 font-medium mb-4 text-sm flex items-center gap-2">
+                ⚔️ Mata-Mata (Eliminatórias)
+              </h3>
+
+              {bracketMode === 'bracket' ? (
+                <div className="space-y-3">
+                  <div className="bg-amber-500/5 border border-amber-500/10 rounded-xl p-3">
+                    <p className="text-xs text-amber-300">Torneio em andamento!</p>
+                    {bracketData && (
+                      <p className="text-[10px] text-gray-500 mt-1">
+                        Round {(bracketData.currentRound || 0) + 1} de {bracketData.rounds?.length || 3}
+                        {bracketData.status === 'finished' && ' — Finalizado!'}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    onClick={handleEndBracket}
+                    className="w-full px-4 py-2.5 rounded-xl text-sm font-medium bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-all"
+                  >
+                    Encerrar Mata-Mata
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-[10px] text-gray-500 leading-relaxed">
+                    Seleciona os Top 4 da votação geral e inicia um torneio de eliminatórias (Semifinal 1, Semifinal 2, Final).
+                    O chat vota usando <code className="text-violet-400">!1</code> ou <code className="text-violet-400">!2</code>.
+                  </p>
+
+                  {/* Duration config */}
+                  <div className="flex items-center gap-3">
+                    <label className="text-xs text-gray-400 shrink-0">Tempo por round:</label>
+                    <input
+                      type="number"
+                      min="10"
+                      max="300"
+                      value={bracketRoundDuration}
+                      onChange={(e) => setBracketRoundDuration(Math.max(10, Math.min(300, Number(e.target.value))))}
+                      className="w-20 bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-white text-sm text-center focus:outline-none focus:border-violet-500/50"
+                    />
+                    <span className="text-xs text-gray-500">segundos</span>
+                  </div>
+
+                  {/* Top 4 Preview */}
+                  {ranking.length >= 4 ? (
+                    <div className="space-y-2">
+                      <p className="text-[10px] text-gray-500">Semifinais:</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="bg-cyan-500/5 border border-cyan-500/10 rounded-lg p-2 text-center">
+                          <p className="text-[10px] text-gray-500 mb-1">Semi 1</p>
+                          <p className="text-xs text-white font-medium truncate">{ranking[0]?.name}</p>
+                          <p className="text-[10px] text-gray-600">vs</p>
+                          <p className="text-xs text-white font-medium truncate">{ranking[1]?.name}</p>
+                        </div>
+                        <div className="bg-red-500/5 border border-red-500/10 rounded-lg p-2 text-center">
+                          <p className="text-[10px] text-gray-500 mb-1">Semi 2</p>
+                          <p className="text-xs text-white font-medium truncate">{ranking[2]?.name}</p>
+                          <p className="text-[10px] text-gray-600">vs</p>
+                          <p className="text-xs text-white font-medium truncate">{ranking[3]?.name}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-red-400">Precisamos de pelo menos 4 filmes votados para iniciar.</p>
+                  )}
+
+                  <button
+                    onClick={handleStartBracket}
+                    disabled={ranking.length < 4 || isStartingBracket}
+                    className={`w-full px-4 py-2.5 rounded-xl text-sm font-medium transition-all border ${
+                      ranking.length < 4 || isStartingBracket
+                        ? 'opacity-50 cursor-not-allowed bg-white/5 text-gray-500 border-white/10'
+                        : 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20 hover:scale-[1.02]'
+                    }`}
+                  >
+                    {isStartingBracket ? '⚔️ Iniciando...' : '⚔️ Iniciar Mata-Mata com Top 4'}
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* ── GUIA DE COMANDOS E CONTROLES ── */}

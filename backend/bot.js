@@ -101,6 +101,20 @@ client.on('message', async (channel, tags, message, self) => {
     return;
   }
 
+  // ── !1 ou !2 (Mata-Mata) ──
+  if (msg === '!1' || msg === '!2') {
+    const choice = parseInt(msg.slice(1));
+    const result = await apiRequest('vote-bracket', { username, choice });
+    if (result.error) {
+      if (result.code === 'NO_BRACKET') {
+        client.say(channel, `❌ Nenhum mata-mata ativo no momento!`);
+      }
+    } else if (result.success) {
+      client.say(channel, `@${username} votou no Filme ${choice} ⚔️`);
+    }
+    return;
+  }
+
   // ── !meuvoto / !mv ──
   if (msg === '!meuvoto' || msg === '!myvote' || msg === '!mv') {
     try {
@@ -188,6 +202,50 @@ client.on('message', async (channel, tags, message, self) => {
         } else {
           client.say(channel, 'Votação encerrada. Nenhum voto foi registrado.');
         }
+      }
+      return;
+    }
+
+    // ── !matamata / !mm (Iniciar Mata-Mata com Top 4) ──
+    if (msg === '!matamata' || msg === '!mm') {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/ranking`);
+        const data = await response.json();
+        const top4 = (data.ranking || []).slice(0, 4);
+        if (top4.length < 4) {
+          client.say(channel, `❌ Precisamos de pelo menos 4 filmes votados para o mata-mata! (temos ${top4.length})`);
+          return;
+        }
+        const movies = top4.map(m => m.name);
+        const movieData = {};
+        for (const m of top4) {
+          movieData[m.name] = { posterPath: m.posterPath, year: m.year, voteAverage: m.voteAverage, overview: m.overview, certification: m.certification };
+        }
+        const result = await apiRequest('control', { action: 'start-bracket', movies, movieData, roundDuration: 60 });
+        if (result.success) {
+          client.say(channel, `⚔️ MATA-MATA INICIADO! Semifinal 1: "${movies[0]}" VS "${movies[1]}" — Vote !1 ou !2!`);
+        } else {
+          client.say(channel, `Erro ao iniciar mata-mata: ${result.error}`);
+        }
+      } catch (e) {
+        client.say(channel, 'Erro ao iniciar mata-mata.');
+      }
+      return;
+    }
+
+    // ── !proximo / !pr (Avançar Round do Mata-Mata) ──
+    if (msg === '!proximo' || msg === '!pr') {
+      const result = await apiRequest('control', { action: 'next-round' });
+      if (result.success) {
+        if (result.champion) {
+          client.say(channel, `🏆 CAMPEÃO DO MATA-MATA: "${result.champion}"! Parabéns! 🎉`);
+        } else {
+          const bracket = result.bracket;
+          const round = bracket.rounds[bracket.currentRound];
+          client.say(channel, `⚔️ Próximo round: "${round.movieA}" VS "${round.movieB}" — Vote !1 ou !2!`);
+        }
+      } else {
+        client.say(channel, `Erro: ${result.error || 'Nenhum mata-mata ativo.'}`);
       }
       return;
     }
