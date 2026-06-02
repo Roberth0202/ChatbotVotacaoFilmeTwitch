@@ -4,7 +4,7 @@ const { applyCors } = require('./_lib/cors');
 
 module.exports = async function handler(req, res) {
   if (applyCors(req, res, 'GET, OPTIONS')) return;
-  res.setHeader('Cache-Control', 's-maxage=3, stale-while-revalidate=5');
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
 
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });

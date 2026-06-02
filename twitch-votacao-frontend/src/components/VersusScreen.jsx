@@ -18,9 +18,10 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
   const autoAdvanceRef = useRef(null);
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
-  const sparkIntervalRef = useRef(null);
   const hasAdvancedRef = useRef(false);
-  const { emitSparks, emitConfetti, stopAll } = useParticles(canvasRef);
+  const [nextRoundTimeLeft, setNextRoundTimeLeft] = useState(5);
+  const nextRoundTimerRef = useRef(null);
+  const { emitConfetti, stopAll } = useParticles(canvasRef);
 
   const currentRound = bracket?.rounds?.[bracket.currentRound];
   const roundDuration = bracket?.roundDuration || 60;
@@ -52,19 +53,42 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Timer countdown
+  // Fix clock drift: Purely local timer with localStorage persistence across F5
+  // 1. Reset timer when round changes
   useEffect(() => {
-    if (isFinished || showingResult || !bracket?.roundStartedAt) return;
-
+    if (!bracket?.roundStartedAt) return;
     hasAdvancedRef.current = false;
+    
+    // Check if we already have a target time saved for this specific round start
+    const storageKey = `timer_${bracket.roundStartedAt}`;
+    let targetTime = sessionStorage.getItem(storageKey);
+    
+    if (!targetTime) {
+      targetTime = Date.now() + roundDuration * 1000;
+      sessionStorage.setItem(storageKey, targetTime);
+    }
+    
+    const initialRemaining = Math.max(0, Math.ceil((targetTime - Date.now()) / 1000));
+    setTimeLeft(initialRemaining);
+    
+  }, [bracket?.currentRound, roundDuration, bracket?.roundStartedAt]);
 
-    const updateTimer = () => {
-      const started = new Date(bracket.roundStartedAt).getTime();
-      const now = Date.now();
-      const elapsed = Math.floor((now - started) / 1000);
-      const remaining = Math.max(0, roundDuration - elapsed);
+  // 2. Keep the latest handleRoundEnd function in a ref to avoid interval restarts
+  const handleRoundEndRef = useRef();
+
+  // 3. The tick interval
+  useEffect(() => {
+    if (isFinished || showingResult) return;
+
+    timerRef.current = setInterval(() => {
+      if (!bracket?.roundStartedAt) return;
+      
+      const storageKey = `timer_${bracket.roundStartedAt}`;
+      const targetTime = parseInt(sessionStorage.getItem(storageKey) || '0', 10);
+      
+      const remaining = Math.max(0, Math.ceil((targetTime - Date.now()) / 1000));
       setTimeLeft(remaining);
-
+        
       // Urgency effects
       if (remaining <= 10 && remaining > 0) {
         if (remaining <= 5) {
@@ -76,17 +100,14 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
       // Time's up — auto advance
       if (remaining <= 0 && isAdmin && !hasAdvancedRef.current) {
         hasAdvancedRef.current = true;
-        clearInterval(timerRef.current);
-        handleRoundEnd();
+        if (handleRoundEndRef.current) {
+          setTimeout(() => handleRoundEndRef.current(), 0);
+        }
       }
-    };
-
-    updateTimer();
-    timerRef.current = setInterval(updateTimer, 1000);
+    }, 1000);
 
     return () => clearInterval(timerRef.current);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bracket?.roundStartedAt, bracket?.currentRound, roundDuration, isFinished, showingResult, isAdmin]);
+  }, [isFinished, showingResult, isAdmin, bracket?.roundStartedAt]);
 
   // Poll votes for current round
   useEffect(() => {
@@ -115,27 +136,16 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
     return () => clearInterval(interval);
   }, [API_URL, bracket?.currentRound, currentRound?.movieA, currentRound?.movieB, isFinished, showingResult]);
 
-  // Sparks at collision point
+  // Reset internal state if the round changes externally (e.g. bot command !proximo)
   useEffect(() => {
-    if (isFinished || showingResult) return;
-
-    const total = localVotesA + localVotesB;
-    if (total === 0) return;
-
-    const intensity = 1 - Math.abs(localVotesA - localVotesB) / Math.max(total, 1);
-
-    sparkIntervalRef.current = setInterval(() => {
-      if (!canvasRef.current) return;
-      const canvas = canvasRef.current;
-      const percentA = localVotesA / Math.max(total, 1);
-      // Collision point is where the two bars meet
-      const collisionX = canvas.width * percentA;
-      const collisionY = canvas.height * 0.55; // aligned with progress bar area
-      emitSparks(collisionX, collisionY, intensity * 0.8);
-    }, 150);
-
-    return () => clearInterval(sparkIntervalRef.current);
-  }, [localVotesA, localVotesB, isFinished, showingResult, emitSparks]);
+    setShowingResult(false);
+    setRoundWinner(null);
+    setLocalVotesA(0);
+    setLocalVotesB(0);
+    hasAdvancedRef.current = false;
+    clearInterval(nextRoundTimerRef.current);
+    clearTimeout(autoAdvanceRef.current);
+  }, [bracket?.currentRound]);
 
   // Champion screen
   useEffect(() => {
@@ -147,32 +157,44 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
 
   // Handle round end
   const handleRoundEnd = useCallback(async () => {
-    clearInterval(sparkIntervalRef.current);
+    clearInterval(nextRoundTimerRef.current);
 
     setShowingResult(true);
     const winner = localVotesA >= localVotesB ? currentRound?.movieA : currentRound?.movieB;
     setRoundWinner(winner);
+    
+    setNextRoundTimeLeft(5);
+    nextRoundTimerRef.current = setInterval(() => {
+      setNextRoundTimeLeft(prev => Math.max(0, prev - 1));
+    }, 1000);
 
     // Wait for result display interval then advance
     autoAdvanceRef.current = setTimeout(async () => {
+      clearInterval(nextRoundTimerRef.current);
       if (onNextRound) {
         await onNextRound();
       }
-      setShowingResult(false);
-      setRoundWinner(null);
-      setLocalVotesA(0);
-      setLocalVotesB(0);
-    }, 8000); // 8 seconds to show result
+      // Note: setShowingResult(false) is now handled robustly by the useEffect 
+      // listening to bracket.currentRound changes.
+    }, 5000); // 5 seconds to show result
 
-    return () => clearTimeout(autoAdvanceRef.current);
+    return () => {
+      clearTimeout(autoAdvanceRef.current);
+      clearInterval(nextRoundTimerRef.current);
+    };
   }, [localVotesA, localVotesB, currentRound, onNextRound]);
+
+  // Keep the ref updated with the latest callback
+  useEffect(() => {
+    handleRoundEndRef.current = handleRoundEnd;
+  }, [handleRoundEnd]);
 
   // Cleanup
   useEffect(() => {
     return () => {
       clearInterval(timerRef.current);
       clearTimeout(autoAdvanceRef.current);
-      clearInterval(sparkIntervalRef.current);
+      clearInterval(nextRoundTimerRef.current);
       stopAll();
     };
   }, [stopAll]);
@@ -362,10 +384,12 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
 
         {/* Movie A (Left — Cyan/Blue) */}
         <div
-          className="relative overflow-hidden transition-all duration-1000 ease-out"
+          key={`movieA-${currentRound.movieA}`}
+          className="relative overflow-hidden transition-all duration-1000 ease-in-out"
           style={{
-            flex: showingResult ? (roundWinner === currentRound.movieA ? 2 : 0.5) : 1,
-            animation: !showingResult ? 'versusSlideLeft 0.6s ease-out' : undefined
+            flex: showingResult ? (roundWinner === currentRound.movieA ? 1 : 0.0001) : 1,
+            opacity: showingResult && roundWinner !== currentRound.movieA ? 0 : 1,
+            animation: !showingResult ? 'versusSlideLeft 0.8s cubic-bezier(0.16, 1, 0.3, 1)' : undefined
           }}
         >
           {/* Background poster */}
@@ -419,27 +443,42 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
         </div>
 
         {/* VS Badge (Center) */}
-        <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
+        <div className={`absolute inset-0 flex items-center justify-center z-20 pointer-events-none transition-all duration-700 ${showingResult ? 'opacity-0 scale-50' : 'opacity-100 scale-100'}`}>
           <div
             className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center font-black text-xl sm:text-2xl border-2 ${
-              showingResult
-                ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400'
-                : isCritical
+                isCritical
                 ? 'bg-red-500/20 border-red-500/50 text-red-400 animate-pulseGlow'
                 : 'bg-black/60 border-amber-500/50 text-amber-400 animate-vsBounce'
             }`}
             style={{ backdropFilter: 'blur(8px)' }}
           >
-            {showingResult ? '✓' : 'VS'}
+            VS
           </div>
         </div>
 
+        {/* Result countdown (Moved to the Right Side) */}
+        {showingResult && (
+          <div className="absolute top-16 right-4 sm:right-8 z-30 flex flex-col items-center bg-black/80 backdrop-blur-md px-6 py-5 rounded-2xl border border-emerald-500/50 shadow-2xl shadow-emerald-500/20 animate-championReveal">
+            <span className="text-emerald-400 font-bold text-lg sm:text-xl mb-2 text-center drop-shadow-md">🎉 Vitória de {roundWinner}!</span>
+            <span className="text-gray-300 text-xs sm:text-xs mb-1 uppercase tracking-wider font-semibold">
+              {nextRoundTimeLeft === 0 
+                ? 'Carregando...' 
+                : (bracket?.currentRound === bracket?.rounds?.length - 1 ? 'Encerrando torneio em' : 'Próximo round em')}
+            </span>
+            {nextRoundTimeLeft > 0 && (
+              <span className="text-3xl sm:text-4xl font-black text-amber-400 drop-shadow-lg">{nextRoundTimeLeft}</span>
+            )}
+          </div>
+        )}
+
         {/* Movie B (Right — Red/Orange) */}
         <div
-          className="relative overflow-hidden transition-all duration-1000 ease-out"
+          key={`movieB-${currentRound.movieB}`}
+          className="relative overflow-hidden transition-all duration-1000 ease-in-out"
           style={{
-            flex: showingResult ? (roundWinner === currentRound.movieB ? 2 : 0.5) : 1,
-            animation: !showingResult ? 'versusSlideRight 0.6s ease-out' : undefined
+            flex: showingResult ? (roundWinner === currentRound.movieB ? 1 : 0.0001) : 1,
+            opacity: showingResult && roundWinner !== currentRound.movieB ? 0 : 1,
+            animation: !showingResult ? 'versusSlideRight 0.8s cubic-bezier(0.16, 1, 0.3, 1)' : undefined
           }}
         >
           {/* Background poster */}
@@ -551,19 +590,12 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
               Vote no chat: <code className="text-cyan-400">!1</code> ou <code className="text-red-400">!2</code>
             </p>
           )}
-
-          {/* Result countdown */}
-          {showingResult && (
-            <p className="text-center text-[10px] text-emerald-400 mt-2 animate-pulse">
-              Próximo confronto em instantes...
-            </p>
-          )}
         </div>
       </div>
 
       {/* Admin Manual Controls (fallback) */}
       {isAdmin && !showingResult && (
-        <div className="absolute bottom-20 sm:bottom-24 right-3 sm:right-4 z-20 flex flex-col gap-2">
+        <div className="absolute bottom-32 sm:bottom-36 right-3 sm:right-4 z-20 flex flex-col gap-2">
           <button
             onClick={handleRoundEnd}
             className="text-[10px] px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-all"

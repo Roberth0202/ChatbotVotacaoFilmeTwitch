@@ -65,7 +65,16 @@ async function validateMovie(movieName) {
     }
 
     console.log(`[TMDB API FETCH] "${movieName}"`);
-    const searchUrl = `${TMDB_BASE_URL}/search/movie?query=${encodeURIComponent(movieName)}&language=pt-BR`;
+    let cleanName = movieName.trim();
+    let yearParam = '';
+    const yearMatch = cleanName.match(/^(.*?)\s*\(\s*(\d{4})\s*\)\s*$/);
+    
+    if (yearMatch && yearMatch[1].trim() !== '') {
+      cleanName = yearMatch[1].trim();
+      yearParam = `&primary_release_year=${yearMatch[2]}`;
+    }
+
+    const searchUrl = `${TMDB_BASE_URL}/search/movie?query=${encodeURIComponent(cleanName)}&language=pt-BR${yearParam}`;
     const response = await fetch(searchUrl, { headers: getTmdbHeaders() });
 
     if (!response.ok) {
@@ -75,21 +84,46 @@ async function validateMovie(movieName) {
     const data = await response.json();
 
     if (data.results && data.results.length > 0) {
-      const movie = data.results[0];
+      let selectedMovie = null;
+
+      // If a year was explicitly requested, we trust TMDB's top result (which filtered by year)
+      if (yearParam) {
+        selectedMovie = data.results[0];
+      } else {
+        // If no year was requested, we want the *most recent* exact match
+        const exactMatches = data.results.filter(m => 
+          (m.title && m.title.toLowerCase() === cleanName.toLowerCase()) || 
+          (m.original_title && m.original_title.toLowerCase() === cleanName.toLowerCase())
+        );
+
+        if (exactMatches.length > 0) {
+          // Sort exact matches by release date descending (newest first)
+          exactMatches.sort((a, b) => {
+            const dateA = a.release_date ? new Date(a.release_date).getTime() : 0;
+            const dateB = b.release_date ? new Date(b.release_date).getTime() : 0;
+            return dateB - dateA;
+          });
+          selectedMovie = exactMatches[0];
+        } else {
+          // Fallback to the most popular result if there's no exact match
+          selectedMovie = data.results[0];
+        }
+      }
+
       const [certification, runtime] = await Promise.all([
-        fetchCertification(movie.id),
-        fetchRuntime(movie.id)
+        fetchCertification(selectedMovie.id),
+        fetchRuntime(selectedMovie.id)
       ]);
 
       const resultObj = {
         valid: true,
-        title: movie.title,
-        originalTitle: movie.original_title,
-        posterPath: movie.poster_path,
-        year: movie.release_date ? movie.release_date.split('-')[0] : null,
-        overview: movie.overview || null,
-        voteAverage: movie.vote_average || null,
-        genreIds: movie.genre_ids || [],
+        title: selectedMovie.title,
+        originalTitle: selectedMovie.original_title,
+        posterPath: selectedMovie.poster_path,
+        year: selectedMovie.release_date ? selectedMovie.release_date.split('-')[0] : null,
+        overview: selectedMovie.overview || null,
+        voteAverage: selectedMovie.vote_average || null,
+        genreIds: selectedMovie.genre_ids || [],
         runtime,
         certification
       };
@@ -127,7 +161,16 @@ async function searchMovies(query) {
   if (!normalizedQuery) return { results: [] };
 
   try {
-    const searchUrl = `${TMDB_BASE_URL}/search/movie?query=${encodeURIComponent(query)}&language=pt-BR&page=1`;
+    let cleanName = query.trim();
+    let yearParam = '';
+    const yearMatch = cleanName.match(/^(.*?)\s*\(\s*(\d{4})\s*\)\s*$/);
+    
+    if (yearMatch && yearMatch[1].trim() !== '') {
+      cleanName = yearMatch[1].trim();
+      yearParam = `&primary_release_year=${yearMatch[2]}`;
+    }
+
+    const searchUrl = `${TMDB_BASE_URL}/search/movie?query=${encodeURIComponent(cleanName)}&language=pt-BR&page=1${yearParam}`;
     const response = await fetch(searchUrl, { headers: getTmdbHeaders() });
 
     if (!response.ok) {
