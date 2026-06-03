@@ -1345,7 +1345,8 @@ export default function TwitchMovieVoting() {
                       min="10"
                       max="300"
                       value={bracketRoundDuration}
-                      onChange={(e) => setBracketRoundDuration(Math.max(10, Math.min(300, Number(e.target.value))))}
+                      onChange={(e) => setBracketRoundDuration(e.target.value)}
+                      onBlur={(e) => setBracketRoundDuration(Math.max(10, Math.min(300, Number(e.target.value) || 60)))}
                       className="w-20 bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-white text-sm text-center focus:outline-none focus:border-violet-500/50"
                     />
                     <span className="text-xs text-gray-500">segundos</span>
