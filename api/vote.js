@@ -53,24 +53,39 @@ module.exports = async function handler(req, res) {
     const movieTitle = validation.title || sanitizedMovie;
     const previousVote = previousVoteDoc?.movie || null;
 
-    await db.collection('votes').updateOne(
+    // Save vote with only essential fields (no repeated movie metadata)
+    const saveVote = db.collection('votes').updateOne(
       { username },
       {
         $set: {
           username,
           movie: movieTitle,
-          posterPath: validation.posterPath,
-          year: validation.year,
-          overview: validation.overview,
-          voteAverage: validation.voteAverage,
-          certification: validation.certification,
-          genreIds: validation.genreIds || [],
-          runtime: validation.runtime || null,
           votedAt: new Date().toISOString()
         }
       },
       { upsert: true }
     );
+
+    // Upsert movie metadata once into the dedicated `movies` collection
+    const saveMovie = db.collection('movies').updateOne(
+      { _id: movieTitle.toLowerCase() },
+      {
+        $set: {
+          title: movieTitle,
+          posterPath: validation.posterPath || null,
+          year: validation.year || null,
+          overview: validation.overview || null,
+          voteAverage: validation.voteAverage || null,
+          certification: validation.certification || null,
+          genreIds: validation.genreIds || [],
+          runtime: validation.runtime || null,
+          updatedAt: new Date().toISOString()
+        }
+      },
+      { upsert: true }
+    );
+
+    await Promise.all([saveVote, saveMovie]);
 
     return res.status(200).json({
       success: true,

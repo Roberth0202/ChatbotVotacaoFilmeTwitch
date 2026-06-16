@@ -16,89 +16,102 @@ module.exports = async function handler(req, res) {
     const session = await db.collection('session').findOne({ _id: 'current' });
     const votingActive = session?.votingActive || false;
 
+    // Aggregate votes and join with movies collection for metadata
     const rankingData = await db.collection('votes').aggregate([
       {
         $group: {
-          _id: "$movie",
+          _id: '$movie',
           count: { $sum: 1 },
-          voters: { $push: "$username" },
-          posterPath: { $first: "$posterPath" },
-          year: { $first: "$year" },
-          overview: { $first: "$overview" },
-          voteAverage: { $first: "$voteAverage" },
-          certification: { $first: "$certification" },
-          genreIds: { $first: "$genreIds" },
-          runtime: { $first: "$runtime" }
+          voters: { $push: '$username' }
         }
       },
       {
         $sort: { count: -1, _id: 1 }
+      },
+      {
+        $lookup: {
+          from: 'movies',
+          localField: '_id',
+          foreignField: 'title',
+          as: 'movieInfo'
+        }
+      },
+      {
+        $addFields: {
+          info: { $arrayElemAt: ['$movieInfo', 0] }
+        }
+      },
+      {
+        $project: {
+          movieInfo: 0
+        }
       }
     ]).toArray();
 
     const totalVotes = rankingData.reduce((acc, curr) => acc + curr.count, 0);
 
+    // Movies missing metadata in `movies` collection (legacy votes or new)
+    const missingMeta = rankingData.filter(m => !m.info && process.env.TMDB_API_KEY);
+
+    if (missingMeta.length > 0) {
+      // Fetch and persist missing metadata without blocking the response
+      Promise.all(missingMeta.map(async (item) => {
+        try {
+          const searchUrl = `${TMDB_BASE_URL}/search/movie?query=${encodeURIComponent(item._id)}&language=pt-BR`;
+          const resp = await fetch(searchUrl, { headers: getTmdbHeaders() });
+          if (!resp.ok) return;
+
+          const data = await resp.json();
+          if (!data.results?.length) return;
+
+          const tmdbMovie = data.results[0];
+          const genreIds = tmdbMovie.genre_ids || [];
+
+          let runtime = null;
+          const detailResp = await fetch(
+            `${TMDB_BASE_URL}/movie/${tmdbMovie.id}?language=pt-BR`,
+            { headers: getTmdbHeaders() }
+          );
+          if (detailResp.ok) {
+            const detail = await detailResp.json();
+            runtime = detail.runtime || null;
+          }
+
+          // Upsert into movies collection — one doc per film, not per vote
+          db.collection('movies').updateOne(
+            { _id: item._id.toLowerCase() },
+            {
+              $set: {
+                title: item._id,
+                posterPath: tmdbMovie.poster_path || null,
+                year: tmdbMovie.release_date?.split('-')[0] || null,
+                overview: tmdbMovie.overview || null,
+                voteAverage: tmdbMovie.vote_average || null,
+                genreIds,
+                runtime,
+                updatedAt: new Date().toISOString()
+              }
+            },
+            { upsert: true }
+          ).catch(() => {});
+        } catch (e) {
+          // Silent fallback
+        }
+      })).catch(() => {});
+    }
+
     const ranking = rankingData.map(data => ({
       name: data._id,
       count: data.count,
       voters: data.voters,
-      posterPath: data.posterPath,
-      year: data.year,
-      overview: data.overview,
-      voteAverage: data.voteAverage,
-      certification: data.certification,
-      genreIds: data.genreIds || [],
-      runtime: data.runtime || null
+      posterPath: data.info?.posterPath || null,
+      year: data.info?.year || null,
+      overview: data.info?.overview || null,
+      voteAverage: data.info?.voteAverage || null,
+      certification: data.info?.certification || null,
+      genreIds: data.info?.genreIds || [],
+      runtime: data.info?.runtime || null
     }));
-
-    // Auto-enriquecer votos sem gêneros ou sem runtime (sem bloquear a resposta)
-    const moviesToEnrich = ranking.filter(m => 
-      (!m.genreIds || m.genreIds.length === 0) || m.runtime === null || m.runtime === undefined
-    );
-    if (moviesToEnrich.length > 0 && process.env.TMDB_API_KEY) {
-      Promise.all(moviesToEnrich.map(async (movie) => {
-        try {
-          const searchUrl = `${TMDB_BASE_URL}/search/movie?query=${encodeURIComponent(movie.name)}&language=pt-BR`;
-          const resp = await fetch(searchUrl, { headers: getTmdbHeaders() });
-          if (resp.ok) {
-            const data = await resp.json();
-            if (data.results && data.results.length > 0) {
-              const tmdbMovie = data.results[0];
-              const updateFields = {};
-
-              if (!movie.genreIds || movie.genreIds.length === 0) {
-                const genreIds = tmdbMovie.genre_ids || [];
-                if (genreIds.length > 0) {
-                  movie.genreIds = genreIds;
-                  updateFields.genreIds = genreIds;
-                }
-              }
-
-              if (movie.runtime === null || movie.runtime === undefined) {
-                const detailUrl = `${TMDB_BASE_URL}/movie/${tmdbMovie.id}?language=pt-BR`;
-                const detailResp = await fetch(detailUrl, { headers: getTmdbHeaders() });
-                if (detailResp.ok) {
-                  const detail = await detailResp.json();
-                  if (detail.runtime) {
-                    movie.runtime = detail.runtime;
-                    updateFields.runtime = detail.runtime;
-                  }
-                }
-              }
-
-              if (Object.keys(updateFields).length > 0) {
-                db.collection('votes').updateMany(
-                  { movie: movie.name },
-                  { $set: updateFields }
-                ).catch(() => {});
-              }
-            }
-          }
-        } catch (e) {
-          // Fallback silencioso
-        }
-      })).catch(() => {});
-    }
 
     const watchedMovies = await db.collection('watched').find({}).sort({ markedAt: -1 }).toArray();
 
