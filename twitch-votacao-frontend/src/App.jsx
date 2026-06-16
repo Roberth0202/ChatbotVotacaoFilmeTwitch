@@ -6,7 +6,8 @@ import VersusScreen from './components/VersusScreen';
 
 const API_URL = process.env.REACT_APP_API_URL || '';
 const TMDB_IMAGE_URL = 'https://image.tmdb.org/t/p/w500';
-const POLLING_SECONDS = 10; // Intervalo de polling em segundos
+const POLLING_SECONDS = 10; // Intervalo de polling em modo normal
+const BRACKET_POLLING_SECONDS = 3; // Polling mais rápido durante o duelo
 const TWITCH_CHANNEL = process.env.REACT_APP_TWITCH_CHANNEL || 'yayahuz';
 
 const TMDB_GENRES = {
@@ -331,20 +332,34 @@ export default function TwitchMovieVoting() {
   }, [isAdmin, isLoggingIn]);
 
   const intervalRef = useRef(null);
+  const bracketModeRef = useRef(bracketMode);
 
-  const startPolling = useCallback(() => {
+  // Keep ref in sync so startPolling always reads the latest mode
+  useEffect(() => {
+    bracketModeRef.current = bracketMode;
+  }, [bracketMode]);
+
+  const startPolling = useCallback((forceInterval) => {
     if (intervalRef.current) clearInterval(intervalRef.current);
-    setPollCountdown(POLLING_SECONDS);
+    const seconds = forceInterval ?? (bracketModeRef.current === 'bracket' ? BRACKET_POLLING_SECONDS : POLLING_SECONDS);
+    setPollCountdown(seconds);
     intervalRef.current = setInterval(() => {
       setPollCountdown(prev => {
         if (prev <= 1) {
           fetchRanking();
-          return POLLING_SECONDS;
+          const next = bracketModeRef.current === 'bracket' ? BRACKET_POLLING_SECONDS : POLLING_SECONDS;
+          return next;
         }
         return prev - 1;
       });
     }, 1000);
   }, [fetchRanking]);
+
+  // When bracket mode changes, immediately fetch and switch polling speed
+  useEffect(() => {
+    fetchRanking();
+    startPolling();
+  }, [bracketMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetchRanking();
@@ -481,7 +496,9 @@ export default function TwitchMovieVoting() {
         setBracketData(data.bracket || null);
         setVotingActive(true);
         setActiveTab('votacao');
+        // Fetch imediato e polling rápido para que todos vejam o duelo logo
         fetchRanking();
+        startPolling(BRACKET_POLLING_SECONDS);
       } else {
         const err = await res.json();
         showModal(err.error || 'Erro ao iniciar mata-mata. A API pode estar desatualizada.', { type: 'error' });
@@ -492,7 +509,7 @@ export default function TwitchMovieVoting() {
     } finally {
       setIsStartingBracket(false);
     }
-  }, [ranking, bracketRoundDuration, fetchRanking, showModal]);
+  }, [ranking, bracketRoundDuration, fetchRanking, startPolling, showModal]);
 
   const handleNextRound = useCallback(async () => {
     controlInFlightRef.current = Date.now();
