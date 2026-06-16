@@ -53,24 +53,25 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Fix clock drift: Purely local timer with localStorage persistence across F5
-  // 1. Reset timer when round changes
+  // Sync timer to server timestamp so all clients (admin + viewers) finish at the same wall-clock time.
+  // Using Date.now() here was the root cause: admin received bracket data instantly (local state),
+  // while regular users received it seconds later via polling — resulting in different targetTimes.
   useEffect(() => {
     if (!bracket?.roundStartedAt) return;
     hasAdvancedRef.current = false;
-    
-    // Check if we already have a target time saved for this specific round start
+
     const storageKey = `timer_${bracket.roundStartedAt}`;
     let targetTime = sessionStorage.getItem(storageKey);
-    
+
     if (!targetTime) {
-      targetTime = Date.now() + roundDuration * 1000;
+      // Anchor to the server's roundStartedAt — same value for every client regardless of when they received the data
+      targetTime = new Date(bracket.roundStartedAt).getTime() + roundDuration * 1000;
       sessionStorage.setItem(storageKey, targetTime);
     }
-    
+
     const initialRemaining = Math.max(0, Math.ceil((targetTime - Date.now()) / 1000));
     setTimeLeft(initialRemaining);
-    
+
   }, [bracket?.currentRound, roundDuration, bracket?.roundStartedAt]);
 
   // 2. Keep the latest handleRoundEnd function in a ref to avoid interval restarts
