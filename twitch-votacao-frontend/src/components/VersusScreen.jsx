@@ -98,8 +98,8 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
         }
       }
 
-      // Time's up — auto advance
-      if (remaining <= 0 && isAdmin && !hasAdvancedRef.current) {
+      // Time's up — show result for ALL users (visual), only admin advances backend
+      if (remaining <= 0 && !hasAdvancedRef.current) {
         hasAdvancedRef.current = true;
         if (handleRoundEndRef.current) {
           setTimeout(() => handleRoundEndRef.current(), 0);
@@ -108,7 +108,7 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
     }, 1000);
 
     return () => clearInterval(timerRef.current);
-  }, [isFinished, showingResult, isAdmin, bracket?.roundStartedAt]);
+  }, [isFinished, showingResult, bracket?.roundStartedAt]);
 
   // Poll votes for current round
   useEffect(() => {
@@ -156,7 +156,7 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
     }
   }, [isFinished, bracket?.champion, emitConfetti]);
 
-  // Handle round end
+  // Handle round end — visual result for everyone, backend advance for admin only
   const handleRoundEnd = useCallback(async () => {
     clearInterval(nextRoundTimerRef.current);
 
@@ -169,21 +169,19 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
       setNextRoundTimeLeft(prev => Math.max(0, prev - 1));
     }, 1000);
 
-    // Wait for result display interval then advance
-    autoAdvanceRef.current = setTimeout(async () => {
-      clearInterval(nextRoundTimerRef.current);
-      if (onNextRound) {
+    // Only admin actually advances the round on the backend
+    if (isAdmin && onNextRound) {
+      autoAdvanceRef.current = setTimeout(async () => {
+        clearInterval(nextRoundTimerRef.current);
         await onNextRound();
-      }
-      // Note: setShowingResult(false) is now handled robustly by the useEffect 
-      // listening to bracket.currentRound changes.
-    }, 5000); // 5 seconds to show result
+      }, 5000);
+    }
 
     return () => {
       clearTimeout(autoAdvanceRef.current);
       clearInterval(nextRoundTimerRef.current);
     };
-  }, [localVotesA, localVotesB, currentRound, onNextRound]);
+  }, [localVotesA, localVotesB, currentRound, onNextRound, isAdmin]);
 
   // Keep the ref updated with the latest callback
   useEffect(() => {
