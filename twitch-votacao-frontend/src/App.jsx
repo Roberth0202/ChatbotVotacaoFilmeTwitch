@@ -3,6 +3,7 @@ import { Film, TrendingUp, Star, Clock, Search, Loader2 } from 'lucide-react';
 import { useTwitchChat } from './hooks/useTwitchChat';
 import GuidedTour from './components/GuidedTour';
 import VersusScreen from './components/VersusScreen';
+import UpdatePopup from './components/UpdatePopup';
 
 const API_URL = process.env.REACT_APP_API_URL || '';
 const TMDB_IMAGE_URL = 'https://image.tmdb.org/t/p/w500';
@@ -562,6 +563,7 @@ export default function TwitchMovieVoting() {
 
   return (
     <div className="min-h-screen bg-[#0d0b1a] text-white font-sans overflow-x-hidden">
+      <UpdatePopup />
 
       {/* ── Header ── */}
       <header className="border-b border-white/5">
