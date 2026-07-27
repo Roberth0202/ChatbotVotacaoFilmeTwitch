@@ -145,8 +145,9 @@ export default function UpdatePopup() {
                 </span>
               </div>
 
-              <h3 className="text-lg sm:text-xl font-bold text-white mb-2 leading-snug">
-                {currentUpdate.title}
+              <h3 className="text-lg sm:text-xl font-bold text-white mb-2 leading-snug flex items-center gap-2">
+                <IconComponent className="w-5 h-5 text-violet-400 shrink-0" />
+                <span>{currentUpdate.title}</span>
               </h3>
 
               <p className="text-sm font-medium text-violet-300/90 mb-3">
