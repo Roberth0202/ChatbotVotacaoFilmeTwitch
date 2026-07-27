@@ -142,6 +142,7 @@ export default function TwitchMovieVoting() {
   const [guideOpen, setGuideOpen] = useState(false);
   const [showTour, setShowTour] = useState(true);
   const [tourInstant, setTourInstant] = useState(false);
+  const [showUpdates, setShowUpdates] = useState(false);
 
   // Bracket / Mata-Mata state
   const [bracketMode, setBracketMode] = useState('general');
@@ -563,7 +564,8 @@ export default function TwitchMovieVoting() {
 
   return (
     <div className="min-h-screen bg-[#0d0b1a] text-white font-sans overflow-x-hidden">
-      <UpdatePopup />
+      <UpdatePopup forceOpen={showUpdates} onClose={() => setShowUpdates(false)} />
+
 
       {/* ── Header ── */}
       <header className="border-b border-white/5">
@@ -620,6 +622,14 @@ export default function TwitchMovieVoting() {
                   {votingActive ? 'Aberta' : 'Fechada'}
                 </span>
               </div>
+              <button
+                onClick={() => setShowUpdates(true)}
+                className="inline-flex items-center gap-1 bg-white/5 border border-white/5 rounded-full px-2.5 py-1.5 text-gray-400 hover:text-violet-300 hover:border-violet-500/20 hover:bg-violet-500/10 transition-all duration-200 cursor-pointer"
+                title="Ver o que mudou no site"
+              >
+                <span className="text-xs">✨</span>
+                <span className="text-[10px] hidden sm:inline">Novidades</span>
+              </button>
               <button
                 onClick={() => {
                   localStorage.removeItem('uzflix-tour-completed');

@@ -5,64 +5,69 @@ const CURRENT_UPDATE_VERSION = 'v1.2.0_mata_mata';
 
 const UPDATES_LIST = [
   {
-    id: 'mata-mata',
-    tag: 'Painel Admin',
-    title: '1. Início do Torneio Mata-Mata',
-    summary: 'Organize os 4 filmes mais votados em um campeonato de eliminatórias.',
-    description: 'No Painel Admin, os moderadores ou o streamer podem configurar a duração de cada round (ex: 60 segundos) e iniciar o Mata-Mata. O sistema puxa automaticamente os Top 4 filmes da votação geral e sorteia as Semifinais.',
-    image: '/updates/começar_mata-mata.png',
-    badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-    icon: Swords
-  },
-  {
-    id: 'chat-vote',
-    tag: 'Chat da Live',
-    title: '2. Votação no Chat (!1 ou !2)',
-    summary: 'Os espectadores votam diretamente na Twitch em tempo real.',
-    description: 'Com o duelo rodando, o chat da live pode participar digitando apenas !1 (para o filme da esquerda) ou !2 (para o filme da direita). O bot contabiliza os votos instantaneamente sem necessidade de recarregar a página.',
-    image: '/updates/votação_no_chat.png',
-    badgeColor: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
-    icon: MessageSquare
-  },
-  {
     id: 'duelo-screen',
     tag: 'Ao Vivo',
-    title: '3. Tela de Duelo (Versus Screen)',
-    summary: 'Acompanhe a batalha em tempo real com cronômetro e porcentagens.',
-    description: 'Visual reformulado para a live! Exibe as capas dos dois filmes frente a frente, o relógio regressivo do round, a barra de progresso de votos em porcentagem e controles rápidos para pular ou encerrar o confronto.',
+    title: '1. Nova Tela de Duelo (Versus Screen)',
+    summary: 'Acompanhe as batalhas entre os filmes em tempo real na tela principal!',
+    description: 'Visual incrível para a live! Exibe as capas dos dois filmes concorrentes frente a frente em alta definição, o relógio regressivo do round, a barra de progresso com porcentagem de votos e o placar instantâneo.',
     image: '/updates/tela_do_duelo.png',
     badgeColor: 'bg-violet-500/20 text-violet-300 border-violet-500/30',
     icon: Sparkles
   },
   {
+    id: 'chat-vote',
+    tag: 'Chat da Live',
+    title: '2. Votação Rápida no Chat (!1 ou !2)',
+    summary: 'Todos os espectadores da live podem votar digitando !1 ou !2!',
+    description: 'Com o duelo rodando, você e toda a comunidade da Twitch participam votando diretamente no chat da live: basta digitar !1 para votar no primeiro filme ou !2 para o segundo. O bot contabiliza tudo em tempo real!',
+    image: '/updates/votação_no_chat.png',
+    badgeColor: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
+    icon: MessageSquare
+  },
+  {
     id: 'campeao-screen',
-    tag: 'Final',
-    title: '4. Pódio do Campeão e Histórico',
-    summary: 'Celebração com troféu e resumo completo dos resultados do campeonato.',
-    description: 'Ao encerrar a Grande Final, o filme vencedor ganha destaque de Campeão com troféu brilhante, nota TMDB e um painel com o histórico de todos os confrontos das Semifinais e Final.',
+    tag: 'Resultado',
+    title: '3. Pódio do Campeão e Tabela de Jogos',
+    summary: 'Animação de celebração com troféu e retrospectiva do campeonato.',
+    description: 'Ao final do torneio, o filme vencedor ganha destaque de Campeão com troféu brilhante, nota oficial do TMDB e uma tabela interativa com o histórico dos placares das Semifinais e Grande Final.',
     image: '/updates/filme_vitorioso.png',
     badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
     icon: Trophy
+  },
+  {
+    id: 'mata-mata',
+    tag: 'Painel Admin',
+    title: '4. Torneio Mata-Mata das Eliminatórias',
+    summary: 'Streamer e Moderadores podem iniciar o torneio com o Top 4 filmes.',
+    description: 'Os moderadores escolhem o tempo por round (ex: 60 segundos) e iniciam o Mata-Mata. O sistema pega automaticamente os Top 4 filmes mais votados do site e sorteia os confrontos das eliminatórias.',
+    image: '/updates/começar_mata-mata.png',
+    badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+    icon: Swords
   }
 ];
 
-export default function UpdatePopup() {
+export default function UpdatePopup({ forceOpen = false, onClose = null }) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
   const [zoomImage, setZoomImage] = useState(null);
 
   useEffect(() => {
+    if (forceOpen) {
+      setIsOpen(true);
+      return;
+    }
     const storageKey = `uzflix_update_seen_${CURRENT_UPDATE_VERSION}`;
     const hasSeen = localStorage.getItem(storageKey);
     if (!hasSeen) {
       setIsOpen(true);
     }
-  }, []);
+  }, [forceOpen]);
 
   const handleClose = () => {
     const storageKey = `uzflix_update_seen_${CURRENT_UPDATE_VERSION}`;
     localStorage.setItem(storageKey, 'true');
     setIsOpen(false);
+    if (onClose) onClose();
   };
 
   if (!isOpen) return null;
@@ -87,14 +92,14 @@ export default function UpdatePopup() {
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">
-                  Novidades da Atualização
+                  O que mudou no UzFlix?
                 </h2>
                 <span className="px-2 py-0.5 text-xs font-semibold rounded-md bg-violet-500/20 border border-violet-500/40 text-violet-300">
                   v1.2.0
                 </span>
               </div>
               <p className="text-xs text-gray-400">
-                Novo Sistema de Torneio Mata-Mata & Duelos no Chat da Twitch!
+                Novidades para todos os espectadores e participantes da live!
               </p>
             </div>
           </div>
@@ -163,7 +168,7 @@ export default function UpdatePopup() {
             <div className="p-3 rounded-xl bg-violet-500/10 border border-violet-500/20 text-xs text-violet-200 flex items-start gap-2">
               <span className="text-base">💡</span>
               <span>
-                <strong>Como testar:</strong> Abra a aba <span className="underline">Votação</span> ou acesse o <span className="underline">Painel Admin</span> para gerenciar os confrontos ao vivo.
+                <strong>Como participar:</strong> Quando o duelo estiver ativo, comande no chat com <span className="underline font-bold">!1</span> ou <span className="underline font-bold">!2</span> para ajudar seu filme favorito a vencer!
               </span>
             </div>
           </div>
