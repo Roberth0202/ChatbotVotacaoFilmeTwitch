@@ -79,6 +79,8 @@ module.exports = async function handler(req, res) {
           { movieA: null, movieB: null, winner: null, votesA: 0, votesB: 0 }
         ];
 
+        const roundStartedAt = new Date().toISOString();
+
         await db.collection('votes').deleteMany({});
         await db.collection('session').updateOne(
           { _id: 'current' },
@@ -92,7 +94,7 @@ module.exports = async function handler(req, res) {
                 rounds,
                 currentRound: 0,
                 roundDuration: duration,
-                roundStartedAt: new Date().toISOString(),
+                roundStartedAt,
                 status: 'voting'
               },
               startedAt: new Date().toISOString()
@@ -104,7 +106,15 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({
           success: true,
           message: 'Bracket started',
-          bracket: { rounds, currentRound: 0, roundDuration: duration }
+          bracket: {
+            movies,
+            movieData: movieData || {},
+            rounds,
+            currentRound: 0,
+            roundDuration: duration,
+            roundStartedAt,
+            status: 'voting'
+          }
         });
       }
 

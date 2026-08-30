@@ -1,5 +1,7 @@
 const ALLOWED_ORIGINS = [
   'https://votacao-filme.vercel.app',
+  'https://www.twitch.tv',
+  'https://twitch.tv',
   'http://localhost:3000',
   'http://localhost:5173'
 ];

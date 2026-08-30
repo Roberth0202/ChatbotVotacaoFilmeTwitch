@@ -288,9 +288,17 @@ export default function TwitchMovieVoting() {
       }
       if (data.watchedMovies) setWatchedMovies(data.watchedMovies);
 
-      // Bracket data
-      setBracketMode(data.mode || 'general');
-      setBracketData(data.bracket || null);
+      // Bracket data — also guarded against stale Vercel cache for 8s after a control action
+      if (Date.now() - controlInFlightRef.current > 8000) {
+        setBracketMode(data.mode || 'general');
+        setBracketData(data.bracket || null);
+      } else if (data.bracket?.roundStartedAt) {
+        // Always accept if we have a newer roundStartedAt than what we have locally
+        setBracketData(prev => {
+          if (!prev?.roundStartedAt) return data.bracket;
+          return new Date(data.bracket.roundStartedAt) > new Date(prev.roundStartedAt) ? data.bracket : prev;
+        });
+      }
 
     } catch (error) {
       setIsConnected(false);
