@@ -54,20 +54,16 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
   }, []);
 
   // Sync timer to server timestamp so all clients (admin + viewers) finish at the same wall-clock time.
-  // Using Date.now() here was the root cause: admin received bracket data instantly (local state),
-  // while regular users received it seconds later via polling — resulting in different targetTimes.
+  // targetTime is always derived from bracket.roundStartedAt (server source of truth),
+  // ensuring every client — regardless of when they open the page — sees the correct remaining time.
   useEffect(() => {
     if (!bracket?.roundStartedAt) return;
     hasAdvancedRef.current = false;
 
-    const storageKey = `timer_${bracket.roundStartedAt}`;
-    let targetTime = sessionStorage.getItem(storageKey);
-
-    if (!targetTime) {
-      // Anchor to the server's roundStartedAt — same value for every client regardless of when they received the data
-      targetTime = new Date(bracket.roundStartedAt).getTime() + roundDuration * 1000;
-      sessionStorage.setItem(storageKey, targetTime);
-    }
+    // Always recalculate from the server timestamp — never cache in sessionStorage,
+    // which would cause late-joining viewers to read an already-expired targetTime and
+    // trigger an immediate false winner declaration.
+    const targetTime = new Date(bracket.roundStartedAt).getTime() + roundDuration * 1000;
 
     const initialRemaining = Math.max(0, Math.ceil((targetTime - Date.now()) / 1000));
     setTimeLeft(initialRemaining);
@@ -84,8 +80,7 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
     timerRef.current = setInterval(() => {
       if (!bracket?.roundStartedAt) return;
       
-      const storageKey = `timer_${bracket.roundStartedAt}`;
-      const targetTime = parseInt(sessionStorage.getItem(storageKey) || '0', 10);
+      const targetTime = new Date(bracket.roundStartedAt).getTime() + roundDuration * 1000;
       
       const remaining = Math.max(0, Math.ceil((targetTime - Date.now()) / 1000));
       setTimeLeft(remaining);
@@ -108,7 +103,7 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
     }, 1000);
 
     return () => clearInterval(timerRef.current);
-  }, [isFinished, showingResult, bracket?.roundStartedAt]);
+  }, [isFinished, showingResult, bracket?.roundStartedAt, roundDuration]);
 
   // Poll votes for current round
   useEffect(() => {
