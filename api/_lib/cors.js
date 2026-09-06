@@ -1,15 +1,19 @@
-const ALLOWED_ORIGINS = [
-  'https://votacao-filme.vercel.app',
-  'https://www.twitch.tv',
-  'https://twitch.tv',
-  'http://localhost:3000',
-  'http://localhost:5173'
+const ALLOWED_ORIGIN_PATTERNS = [
+  /^https:\/\/votacao-filme\.vercel\.app$/,
+  /^https:\/\/.*\.vercel\.app$/,          // preview deployments
+  /^https?:\/\/(www\.)?twitch\.tv$/,      // twitch console tests
+  /^http:\/\/localhost:\d+$/              // local dev
 ];
+
+function isAllowedOrigin(origin) {
+  if (!origin) return false;
+  return ALLOWED_ORIGIN_PATTERNS.some(pattern => pattern.test(origin));
+}
 
 function applyCors(req, res, methods = 'GET, POST, OPTIONS') {
   const origin = req.headers.origin;
 
-  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+  if (isAllowedOrigin(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
   }
 

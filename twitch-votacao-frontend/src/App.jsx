@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Film, TrendingUp, Star, Clock, Search, Loader2 } from 'lucide-react';
+import { Film, TrendingUp, Star, Clock, Search, Loader2, LayoutGrid, LayoutList } from 'lucide-react';
 import { useTwitchChat } from './hooks/useTwitchChat';
 import GuidedTour from './components/GuidedTour';
 import VersusScreen from './components/VersusScreen';
@@ -143,6 +143,8 @@ export default function TwitchMovieVoting() {
   const [showTour, setShowTour] = useState(true);
   const [tourInstant, setTourInstant] = useState(false);
   const [showUpdates, setShowUpdates] = useState(false);
+  const [watchedView, setWatchedView] = useState('grid'); // 'grid' | 'detail'
+  const [watchedSearch, setWatchedSearch] = useState('');
 
   // Bracket / Mata-Mata state
   const [bracketMode, setBracketMode] = useState('general');
@@ -1136,14 +1138,184 @@ export default function TwitchMovieVoting() {
               </div>
             )}
 
+            {/* ── Barra de Pesquisa (visível para todos) ── */}
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <Search className="w-4 h-4 text-gray-500" />
+              </div>
+              <input
+                type="text"
+                value={watchedSearch}
+                onChange={(e) => setWatchedSearch(e.target.value)}
+                placeholder="Pesquisar nos assistidos..."
+                className="w-full bg-black/30 border border-white/10 rounded-xl pl-11 pr-10 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-violet-500/50 transition-colors"
+              />
+              {watchedSearch && (
+                <button
+                  onClick={() => setWatchedSearch('')}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-300 transition-colors"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* ── Toggle de Visualização ── */}
+            {watchedMovies.length > 0 && (() => {
+              const filteredWatched = watchedMovies.filter(m =>
+                (m.title || m.name || '').toLowerCase().includes(watchedSearch.toLowerCase().trim())
+              );
+              return (
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-gray-500">
+                    {watchedSearch.trim()
+                      ? `${filteredWatched.length} resultado${filteredWatched.length !== 1 ? 's' : ''} para "${watchedSearch.trim()}"`
+                      : `${watchedMovies.length} ${watchedMovies.length === 1 ? 'filme assistido' : 'filmes assistidos'}`
+                    }
+                  </p>
+                <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-lg p-1">
+                  <button
+                    onClick={() => setWatchedView('grid')}
+                    title="Visualização em grade"
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+                      watchedView === 'grid'
+                        ? 'bg-violet-500/20 text-violet-300 border border-violet-500/30'
+                        : 'text-gray-500 hover:text-gray-300'
+                    }`}
+                  >
+                    <LayoutGrid className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Grade</span>
+                  </button>
+                  <button
+                    onClick={() => setWatchedView('detail')}
+                    title="Visualização detalhada"
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+                      watchedView === 'detail'
+                        ? 'bg-violet-500/20 text-violet-300 border border-violet-500/30'
+                        : 'text-gray-500 hover:text-gray-300'
+                    }`}
+                  >
+                    <LayoutList className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Detalhes</span>
+                  </button>
+                </div>
+                </div>
+              );
+            })()}
+
             {watchedMovies.length === 0 ? (
               <div className="text-center py-16">
                 <Film className="w-10 h-10 mx-auto mb-4 text-gray-600" />
                 <p className="text-gray-500 text-sm">Nenhum filme assistido ainda</p>
               </div>
-            ) : (
-              <div className="space-y-3 sm:space-y-4">
-                {watchedMovies.map((movie, i) => {
+
+            ) : (() => {
+              const filteredWatched = watchedMovies.filter(m =>
+                (m.title || m.name || '').toLowerCase().includes(watchedSearch.toLowerCase().trim())
+              );
+
+              if (filteredWatched.length === 0) return (
+                <div className="text-center py-12">
+                  <Search className="w-8 h-8 mx-auto mb-3 text-gray-600" />
+                  <p className="text-gray-500 text-sm">Nenhum filme encontrado para <span className="text-gray-300">"{watchedSearch}"</span></p>
+                </div>
+              );
+
+              return watchedView === 'grid' ? (
+                /* ── Modo Grade (ícones médios) ── */
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 gap-3 sm:gap-4">
+                  {filteredWatched.map((movie, i) => {
+                  const certStyle = getCertificationStyle(movie.certification);
+                  return (
+                    <div
+                      key={i}
+                      className="group relative bg-white/[0.03] rounded-lg border border-white/5 overflow-hidden motion-safe:hover:border-violet-500/30 motion-safe:transition-all motion-safe:duration-200 cursor-default"
+                    >
+                      {/* Poster */}
+                      <div className="relative aspect-[2/3] overflow-hidden bg-gray-900/50">
+                        {movie.posterPath ? (
+                          <img
+                            src={`${TMDB_IMAGE_URL}${movie.posterPath}`}
+                            alt={movie.title || movie.name}
+                            loading="lazy"
+                            className="w-full h-full object-cover motion-safe:group-hover:scale-105 motion-safe:transition-transform motion-safe:duration-500"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900">
+                            <Film className="w-8 h-8 text-gray-600" />
+                          </div>
+                        )}
+
+                        {/* Overlay escuro no hover */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 motion-safe:transition-opacity motion-safe:duration-300" />
+
+                        {/* Badge classificação */}
+                        {movie.certification && (
+                          <div className={`absolute top-2 right-2 ${certStyle.bg} text-white text-xs font-bold px-2 py-1 rounded-md shadow-lg`}>
+                            {certStyle.text}
+                          </div>
+                        )}
+
+                        {/* Badge Visto */}
+                        <div className="absolute top-2 left-2 bg-emerald-500/95 text-white text-[11px] font-bold px-2 py-1 rounded-md shadow-lg flex items-center gap-1">
+                          ✓ VISTO
+                        </div>
+
+                        {/* Info no hover */}
+                        <div className="absolute bottom-0 left-0 right-0 p-2 opacity-0 group-hover:opacity-100 motion-safe:transition-opacity motion-safe:duration-300">
+                          {movie.voteAverage && (
+                            <div className="flex items-center gap-0.5 justify-end">
+                              <Star className="w-2.5 h-2.5 text-yellow-400 fill-yellow-400" />
+                              <span className="text-[9px] font-semibold text-yellow-200">{movie.voteAverage.toFixed(1)}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Botão remover admin (hover) */}
+                        {isAdmin && (
+                          <button
+                            onClick={async () => {
+                              const confirmed = await showModal(`Deseja remover "${movie.title || movie.name}" dos assistidos?`, { title: 'Remover filme' });
+                              if (!confirmed) return;
+                              setWatchedMovies(prev => prev.filter(m => m.id !== movie.id));
+                              try {
+                                const res = await fetch(`${API_URL}/api/movies/watch?id=${movie.id}`, {
+                                  method: 'DELETE',
+                                  headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` }
+                                });
+                                if (!res.ok) {
+                                  setWatchedMovies(prev => [...prev, movie].sort((a, b) => new Date(b.markedAt) - new Date(a.markedAt)));
+                                  showModal('Erro ao remover.', { type: 'error' });
+                                }
+                              } catch (e) {
+                                setWatchedMovies(prev => [...prev, movie].sort((a, b) => new Date(b.markedAt) - new Date(a.markedAt)));
+                                showModal('Erro de conexão ao remover.', { type: 'error' });
+                              }
+                            }}
+                            className="absolute top-2 left-2 w-6 h-6 bg-red-500/90 hover:bg-red-500 text-white text-xs rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 motion-safe:transition-all shadow-lg font-bold"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Título + Ano */}
+                      <div className="p-2">
+                        <p className="text-xs text-gray-200 font-semibold leading-tight line-clamp-2 text-center">
+                          {movie.title || movie.name}
+                        </p>
+                        {movie.year && (
+                          <p className="text-[11px] text-gray-400 font-medium text-center mt-1">{movie.year}</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                </div>
+              ) : (
+                /* ── Modo Detalhado ── */
+                <div className="space-y-3 sm:space-y-4">
+                  {filteredWatched.map((movie, i) => {
                   const certStyle = getCertificationStyle(movie.certification);
                   const date = movie.markedAt ? new Date(movie.markedAt) : null;
                   return (
@@ -1154,11 +1326,11 @@ export default function TwitchMovieVoting() {
                           <img
                             src={`${TMDB_IMAGE_URL}${movie.posterPath}`}
                             alt={movie.title || movie.name}
-                            className="w-16 h-24 sm:w-20 sm:h-30 rounded-lg object-cover shrink-0"
+                            className="w-24 h-36 sm:w-32 sm:h-48 rounded-lg object-cover shrink-0"
                           />
                         ) : (
-                          <div className="w-16 h-24 sm:w-20 sm:h-30 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
-                            <Film className="w-6 h-6 text-gray-500" />
+                          <div className="w-24 h-36 sm:w-32 sm:h-48 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
+                            <Film className="w-8 h-8 text-gray-500" />
                           </div>
                         )}
 
@@ -1178,17 +1350,13 @@ export default function TwitchMovieVoting() {
                                 onClick={async () => {
                                   const confirmed = await showModal(`Deseja remover "${movie.title || movie.name}" dos assistidos?`, { title: 'Remover filme' });
                                   if (!confirmed) return;
-                                  // Optimistic UI: remove imediatamente da lista
                                   setWatchedMovies(prev => prev.filter(m => m.id !== movie.id));
                                   try {
                                     const res = await fetch(`${API_URL}/api/movies/watch?id=${movie.id}`, {
                                       method: 'DELETE',
-                                      headers: {
-                                        'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
-                                      }
+                                      headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` }
                                     });
                                     if (!res.ok) {
-                                      // Revert: adiciona de volta se falhar
                                       setWatchedMovies(prev => [...prev, movie].sort((a, b) => new Date(b.markedAt) - new Date(a.markedAt)));
                                       showModal('Erro ao remover.', { type: 'error' });
                                     }
@@ -1233,7 +1401,7 @@ export default function TwitchMovieVoting() {
                           </div>
 
                           {movie.overview && (
-                            <p className="text-[10px] sm:text-xs text-gray-300 leading-relaxed line-clamp-2">
+                            <p className="text-xs sm:text-sm text-gray-300 leading-relaxed line-clamp-4 mt-1">
                               {movie.overview}
                             </p>
                           )}
@@ -1243,7 +1411,8 @@ export default function TwitchMovieVoting() {
                   );
                 })}
               </div>
-            )}
+              );
+            })()}
           </div>
         )}
 
