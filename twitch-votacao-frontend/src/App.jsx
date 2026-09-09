@@ -614,18 +614,18 @@ export default function TwitchMovieVoting() {
                       {isConnected ? 'API Online' : 'API Offline'}
                     </span>
                   </div>
-                  <div id="tour-voting-status" className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 ${
-                    votingActive
-                      ? 'bg-violet-500/15 border border-violet-500/20'
-                      : 'bg-white/5 border border-white/5'
-                  }`}>
-                    <div className={`w-2 h-2 rounded-full ${votingActive ? 'bg-violet-400 motion-safe:animate-pulse' : 'bg-gray-600'}`} />
-                    <span className={`text-xs ${votingActive ? 'text-violet-300' : 'text-gray-500'}`}>
-                      {votingActive ? 'Aberta' : 'Fechada'}
-                    </span>
-                  </div>
                 </>
               )}
+              <div id="tour-voting-status" className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 ${
+                votingActive
+                  ? 'bg-violet-500/15 border border-violet-500/20'
+                  : 'bg-white/5 border border-white/5'
+              }`}>
+                <div className={`w-2 h-2 rounded-full ${votingActive ? 'bg-violet-400 motion-safe:animate-pulse' : 'bg-gray-600'}`} />
+                <span className={`text-xs ${votingActive ? 'text-violet-300' : 'text-gray-500'}`}>
+                  {votingActive ? 'Aberta' : 'Fechada'}
+                </span>
+              </div>
               <button
                 onClick={() => setShowUpdates(true)}
                 className="inline-flex items-center gap-1 bg-white/5 border border-white/5 rounded-full px-2.5 py-1.5 text-gray-400 hover:text-violet-300 hover:border-violet-500/20 hover:bg-violet-500/10 transition-all duration-200 cursor-pointer"
