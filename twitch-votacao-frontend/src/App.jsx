@@ -595,43 +595,37 @@ export default function TwitchMovieVoting() {
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3">
-              <div id="tour-chat-status" className="inline-flex items-center gap-2 bg-white/5 border border-white/5 rounded-full px-3 py-1.5">
-                <div className={`w-2 h-2 rounded-full ${chatConnected ? 'bg-cyan-400 motion-safe:animate-pulse' : 'bg-red-500'}`} />
-                <span className="text-xs text-gray-400 hidden sm:inline">
-                  {chatConnected ? 'Chat Conectado' : 'Sem Chat'}
-                </span>
-                {chatConnected && isAdmin && (
-                  <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded ml-1 border border-emerald-500/20">
-                    Lendo Votos
-                  </span>
-                )}
-                {chatConnected && !isAdmin && !votingActive && (
-                  <span className="text-[10px] text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded ml-1 border border-red-500/20" title="Faça login como Admin para contabilizar votos">
-                    Votos Pausados
-                  </span>
-                )}
-                {chatConnected && !isAdmin && votingActive && (
-                  <span className="text-[10px] text-violet-400 bg-violet-500/10 px-1.5 py-0.5 rounded ml-1 border border-violet-500/20" title="Você está assistindo os votos entrarem">
-                    Acompanhando ao vivo
-                  </span>
-                )}
-              </div>
-              <div className="inline-flex items-center gap-2 bg-white/5 border border-white/5 rounded-full px-3 py-1.5">
-                <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400 motion-safe:animate-pulse' : 'bg-red-500'}`} />
-                <span className="text-xs text-gray-400">
-                  {isConnected ? 'API Online' : 'API Offline'}
-                </span>
-              </div>
-              <div id="tour-voting-status" className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 ${
-                votingActive
-                  ? 'bg-violet-500/15 border border-violet-500/20'
-                  : 'bg-white/5 border border-white/5'
-              }`}>
-                <div className={`w-2 h-2 rounded-full ${votingActive ? 'bg-violet-400 motion-safe:animate-pulse' : 'bg-gray-600'}`} />
-                <span className={`text-xs ${votingActive ? 'text-violet-300' : 'text-gray-500'}`}>
-                  {votingActive ? 'Aberta' : 'Fechada'}
-                </span>
-              </div>
+              {isAdmin && (
+                <>
+                  <div id="tour-chat-status" className="inline-flex items-center gap-2 bg-white/5 border border-white/5 rounded-full px-3 py-1.5">
+                    <div className={`w-2 h-2 rounded-full ${chatConnected ? 'bg-cyan-400 motion-safe:animate-pulse' : 'bg-red-500'}`} />
+                    <span className="text-xs text-gray-400 hidden sm:inline">
+                      {chatConnected ? 'Chat Conectado' : 'Sem Chat'}
+                    </span>
+                    {chatConnected && (
+                      <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded ml-1 border border-emerald-500/20">
+                        Lendo Votos
+                      </span>
+                    )}
+                  </div>
+                  <div className="inline-flex items-center gap-2 bg-white/5 border border-white/5 rounded-full px-3 py-1.5">
+                    <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400 motion-safe:animate-pulse' : 'bg-red-500'}`} />
+                    <span className="text-xs text-gray-400">
+                      {isConnected ? 'API Online' : 'API Offline'}
+                    </span>
+                  </div>
+                  <div id="tour-voting-status" className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 ${
+                    votingActive
+                      ? 'bg-violet-500/15 border border-violet-500/20'
+                      : 'bg-white/5 border border-white/5'
+                  }`}>
+                    <div className={`w-2 h-2 rounded-full ${votingActive ? 'bg-violet-400 motion-safe:animate-pulse' : 'bg-gray-600'}`} />
+                    <span className={`text-xs ${votingActive ? 'text-violet-300' : 'text-gray-500'}`}>
+                      {votingActive ? 'Aberta' : 'Fechada'}
+                    </span>
+                  </div>
+                </>
+              )}
               <button
                 onClick={() => setShowUpdates(true)}
                 className="inline-flex items-center gap-1 bg-white/5 border border-white/5 rounded-full px-2.5 py-1.5 text-gray-400 hover:text-violet-300 hover:border-violet-500/20 hover:bg-violet-500/10 transition-all duration-200 cursor-pointer"
@@ -1822,7 +1816,7 @@ export default function TwitchMovieVoting() {
                   showModal('Falta o REACT_APP_TWITCH_CLIENT_ID no .env do frontend.', { type: 'error' });
                   return;
                 }
-                const redirectUri = window.location.origin; // ex: http://localhost:3000
+                const redirectUri = window.location.origin;
                 const authUrl = `https://id.twitch.tv/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=user:read:email`;
                 window.location.href = authUrl;
               }}
