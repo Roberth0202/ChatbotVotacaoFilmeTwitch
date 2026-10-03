@@ -6,7 +6,7 @@ const TMDB_IMAGE_URL = 'https://image.tmdb.org/t/p/w500';
 
 const ROUND_LABELS = ['Semifinal 1', 'Semifinal 2', 'Grande Final'];
 
-export default function VersusScreen({ bracket, ranking, onNextRound, onEndBracket, isAdmin, API_URL }) {
+export default function VersusScreen({ bracket, ranking, onNextRound, onEndBracket, isAdmin, API_URL, clockOffset = 0 }) {
   const [timeLeft, setTimeLeft] = useState(0);
   const [localVotesA, setLocalVotesA] = useState(0);
   const [localVotesB, setLocalVotesB] = useState(0);
@@ -19,6 +19,8 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const hasAdvancedRef = useRef(false);
+  // Prevents auto-advance when the timer was already expired at mount time
+  const timerExpiredOnMountRef = useRef(false);
   const [nextRoundTimeLeft, setNextRoundTimeLeft] = useState(5);
   const nextRoundTimerRef = useRef(null);
   const { emitConfetti, stopAll } = useParticles(canvasRef);
@@ -26,6 +28,10 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
   const currentRound = bracket?.rounds?.[bracket.currentRound];
   const roundDuration = bracket?.roundDuration || 60;
   const isFinished = bracket?.status === 'finished';
+
+  // Returns the corrected "now" adjusted for the client's clock drift.
+  // clockOffset = serverTime - Date.now() (negative when client clock is ahead).
+  const nowCorrected = useCallback(() => Date.now() + clockOffset, [clockOffset]);
 
   // Get movie data
   const getMovieData = useCallback((movieName) => {
@@ -60,15 +66,17 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
     if (!bracket?.roundStartedAt) return;
     hasAdvancedRef.current = false;
 
-    // Always recalculate from the server timestamp — never cache in sessionStorage,
-    // which would cause late-joining viewers to read an already-expired targetTime and
-    // trigger an immediate false winner declaration.
     const targetTime = new Date(bracket.roundStartedAt).getTime() + roundDuration * 1000;
-
-    const initialRemaining = Math.max(0, Math.ceil((targetTime - Date.now()) / 1000));
+    const initialRemaining = Math.max(0, Math.ceil((targetTime - nowCorrected()) / 1000));
     setTimeLeft(initialRemaining);
 
-  }, [bracket?.currentRound, roundDuration, bracket?.roundStartedAt]);
+    // If the timer was already expired when this round was mounted (e.g. page reload),
+    // mark it so the interval does NOT auto-trigger handleRoundEnd.
+    // The admin can still advance manually via "Pular Round".
+    timerExpiredOnMountRef.current = initialRemaining <= 0;
+
+  }, [bracket?.currentRound, roundDuration, bracket?.roundStartedAt, nowCorrected]);
+
 
   // 2. Keep the latest handleRoundEnd function in a ref to avoid interval restarts
   const handleRoundEndRef = useRef();
@@ -81,8 +89,7 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
       if (!bracket?.roundStartedAt) return;
       
       const targetTime = new Date(bracket.roundStartedAt).getTime() + roundDuration * 1000;
-      
-      const remaining = Math.max(0, Math.ceil((targetTime - Date.now()) / 1000));
+      const remaining = Math.max(0, Math.ceil((targetTime - nowCorrected()) / 1000));
       setTimeLeft(remaining);
         
       // Urgency effects
@@ -93,8 +100,10 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
         }
       }
 
-      // Time's up — show result for ALL users (visual), only admin advances backend
-      if (remaining <= 0 && !hasAdvancedRef.current) {
+      // Time's up — show result for ALL users (visual), only admin advances backend.
+      // Guard: skip auto-advance if the timer was already expired when the component mounted
+      // (prevents false winner declaration on page reload / re-open).
+      if (remaining <= 0 && !hasAdvancedRef.current && !timerExpiredOnMountRef.current) {
         hasAdvancedRef.current = true;
         if (handleRoundEndRef.current) {
           setTimeout(() => handleRoundEndRef.current(), 0);
@@ -103,7 +112,8 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
     }, 1000);
 
     return () => clearInterval(timerRef.current);
-  }, [isFinished, showingResult, bracket?.roundStartedAt, roundDuration]);
+  }, [isFinished, showingResult, bracket?.roundStartedAt, roundDuration, nowCorrected]);
+
 
   // Poll votes for current round
   useEffect(() => {
@@ -132,16 +142,22 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
     return () => clearInterval(interval);
   }, [API_URL, bracket?.currentRound, currentRound?.movieA, currentRound?.movieB, isFinished, showingResult]);
 
-  // Reset internal state if the round changes externally (e.g. bot command !proximo)
+  // Reset internal state when the round changes OR when a new tournament starts.
+  // IMPORTANT: dependency includes roundStartedAt (unique per round/tournament) because
+  // currentRound alone is insufficient — a new tournament always starts at currentRound=0,
+  // same as the previous one, so the effect would never re-fire and showingResult/
+  // showChampion would remain true from the old tournament (admin-only bug).
   useEffect(() => {
     setShowingResult(false);
     setRoundWinner(null);
+    setShowChampion(false);
     setLocalVotesA(0);
     setLocalVotesB(0);
     hasAdvancedRef.current = false;
+    timerExpiredOnMountRef.current = false;
     clearInterval(nextRoundTimerRef.current);
     clearTimeout(autoAdvanceRef.current);
-  }, [bracket?.currentRound]);
+  }, [bracket?.currentRound, bracket?.roundStartedAt]);
 
   // Champion screen
   useEffect(() => {

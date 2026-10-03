@@ -126,7 +126,11 @@ module.exports = async function handler(req, res) {
       votingActive,
       watchedMovies: cleanWatched,
       mode: session?.mode || 'general',
-      bracket: session?.bracket || null
+      bracket: session?.bracket || null,
+      // Server timestamp so clients can correct local clock drift.
+      // Clients whose system clock is wrong would otherwise compute
+      // an incorrect remaining time for bracket rounds.
+      serverTime: Date.now()
     });
   } catch (error) {
     console.error('[API /ranking] Error:', error);

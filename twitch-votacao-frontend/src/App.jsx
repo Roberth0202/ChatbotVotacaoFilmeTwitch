@@ -246,6 +246,10 @@ export default function TwitchMovieVoting() {
   // useRef para evitar recriação do useCallback e reinício do interval
   const prevRankingRef = useRef([]);
   const totalVotesRef = useRef(0);
+  // Offset between server clock and local clock (ms). Corrects client clock drift.
+  // Positive = server is ahead of client; Negative = client is ahead of server.
+  const clockOffsetRef = useRef(0);
+  const [clockOffset, setClockOffset] = useState(0);
 
   const fetchRanking = useCallback(async () => {
     try {
@@ -254,6 +258,13 @@ export default function TwitchMovieVoting() {
 
       const data = await response.json();
       setIsConnected(true);
+
+      // Compute clock offset between server and client.
+      // If the client clock is ahead, clockOffset will be negative.
+      if (typeof data.serverTime === 'number') {
+        clockOffsetRef.current = data.serverTime - Date.now();
+        setClockOffset(clockOffsetRef.current);
+      }
 
       const newRanking = data.ranking || [];
       const newTotal = data.totalVotes || 0;
@@ -729,6 +740,7 @@ export default function TwitchMovieVoting() {
               onEndBracket={handleEndBracket}
               isAdmin={isAdmin}
               API_URL={API_URL}
+              clockOffset={clockOffset}
             />
           </div>
         )}
