@@ -783,17 +783,23 @@ export default function TwitchMovieVoting() {
           </div>
         </div>
 
-        {/* ── Notificação de Voto ── */}
-        {lastVote && (
-          <div className="mb-4 motion-safe:animate-slideDown">
-            <div className="bg-violet-500/10 border border-violet-500/20 rounded-lg p-3">
-              <p className="text-center text-xs sm:text-sm">
-                <span className="font-semibold text-violet-300">@{lastVote.username}</span>
-                {' '}votou em <span className="font-semibold text-white">{lastVote.movie}</span>
-              </p>
-            </div>
+        {/* ── Notificação de Voto (fixa, altura reservada) ── */}
+        <div className="mb-4" style={{ height: lastVote ? 'auto' : '0', overflow: 'hidden' }}>
+          <div className={`bg-violet-500/10 border border-violet-500/20 rounded-lg p-3 transition-all duration-300 motion-safe:animate-slideDown ${
+            lastVote ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          }`}>
+            <p className="text-center text-xs sm:text-sm">
+              {lastVote ? (
+                <>
+                  <span className="font-semibold text-violet-300">@{lastVote.username}</span>
+                  {' '}votou em <span className="font-semibold text-white">{lastVote.movie}</span>
+                </>
+              ) : (
+                <span className="invisible">@user votou em Filme Exemplo</span>
+              )}
+            </p>
           </div>
-        )}
+        </div>
 
         {/* ── Filtro de Gênero ── */}
         <div id="tour-filters" className="mb-4 flex items-center gap-2">
