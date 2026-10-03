@@ -783,23 +783,29 @@ export default function TwitchMovieVoting() {
           </div>
         </div>
 
-        {/* ── Notificação de Voto (fixa, altura reservada) ── */}
-        <div className="mb-4" style={{ height: lastVote ? 'auto' : '0', overflow: 'hidden' }}>
-          <div className={`bg-violet-500/10 border border-violet-500/20 rounded-lg p-3 transition-all duration-300 motion-safe:animate-slideDown ${
-            lastVote ? 'opacity-100' : 'opacity-0 pointer-events-none'
-          }`}>
-            <p className="text-center text-xs sm:text-sm">
-              {lastVote ? (
-                <>
-                  <span className="font-semibold text-violet-300">@{lastVote.username}</span>
-                  {' '}votou em <span className="font-semibold text-white">{lastVote.movie}</span>
-                </>
-              ) : (
-                <span className="invisible">@user votou em Filme Exemplo</span>
-              )}
-            </p>
+        {/* ── Notificação de Voto (Fixa durante votação aberta) ── */}
+        {votingActive && (
+          <div className="mb-4">
+            <div className="bg-violet-500/10 border border-violet-500/20 rounded-lg px-4 py-2.5 min-h-[46px] flex items-center justify-center transition-all duration-300">
+              <p className="text-center text-xs sm:text-sm truncate max-w-full">
+                {lastVote ? (
+                  <span
+                    key={`${lastVote.username}-${lastVote.movie}-${lastVote.totalVotes}`}
+                    className="motion-safe:animate-fadeIn inline-block truncate max-w-full"
+                  >
+                    <span className="font-semibold text-violet-300">@{lastVote.username}</span>
+                    {' '}votou em <span className="font-semibold text-white">{lastVote.movie}</span>
+                  </span>
+                ) : (
+                  <span className="text-violet-300/70 flex items-center justify-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-violet-400 motion-safe:animate-pulse shrink-0" />
+                    <span className="truncate">Votação aberta! Envie <strong className="text-violet-200 font-semibold">!v (Filme)</strong> no chat</span>
+                  </span>
+                )}
+              </p>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* ── Filtro de Gênero ── */}
         <div id="tour-filters" className="mb-4 flex items-center gap-2">
