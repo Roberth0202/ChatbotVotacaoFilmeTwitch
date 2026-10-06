@@ -819,7 +819,7 @@ export default function TwitchMovieVoting() {
             className="bg-violet-500/15 text-white text-[11px] sm:text-xs border border-violet-500/30 rounded-lg px-2.5 py-1.5 outline-none focus:border-violet-500/60 transition-colors cursor-pointer appearance-none max-w-[180px]"
             style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23a78bfa' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', paddingRight: '24px' }}
           >
-            <option value="">Todos os gêneros</option>
+            <option value="">Filtrar por gênero</option>
             {Object.entries(TMDB_GENRES)
               .sort(([,a], [,b]) => a.localeCompare(b))
               .map(([id, name]) => (

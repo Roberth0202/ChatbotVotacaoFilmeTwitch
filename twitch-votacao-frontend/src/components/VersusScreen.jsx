@@ -19,8 +19,9 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const hasAdvancedRef = useRef(false);
-  // Prevents auto-advance when the timer was already expired at mount time
+  // Evita avanço falso imediato se o cronômetro já estava expirado na montagem, usando fallback de segurança
   const timerExpiredOnMountRef = useRef(false);
+  const zeroTicksRef = useRef(0);
   const [nextRoundTimeLeft, setNextRoundTimeLeft] = useState(5);
   const nextRoundTimerRef = useRef(null);
   const { emitConfetti, stopAll } = useParticles(canvasRef);
@@ -29,16 +30,16 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
   const roundDuration = bracket?.roundDuration || 60;
   const isFinished = bracket?.status === 'finished';
 
-  // Returns the corrected "now" adjusted for the client's clock drift.
-  // clockOffset = serverTime - Date.now() (negative when client clock is ahead).
+  // Retorna o "agora" corrigido e ajustado para a diferença de relógio do cliente.
+  // clockOffset = serverTime - Date.now() (negativo quando o relógio do cliente está adiantado).
   const nowCorrected = useCallback(() => Date.now() + clockOffset, [clockOffset]);
 
-  // Get movie data
+  // Obter dados do filme
   const getMovieData = useCallback((movieName) => {
     if (!movieName) return {};
-    // Try bracket movieData first
+    // Tenta primeiro os dados do filme no chaveamento (bracket)
     if (bracket?.movieData?.[movieName]) return bracket.movieData[movieName];
-    // Fallback to ranking data
+    // Fallback para os dados do ranking
     const fromRanking = ranking?.find(m => m.name === movieName);
     return fromRanking || {};
   }, [bracket, ranking]);
@@ -46,7 +47,7 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
   const movieA = useMemo(() => getMovieData(currentRound?.movieA), [getMovieData, currentRound?.movieA]);
   const movieB = useMemo(() => getMovieData(currentRound?.movieB), [getMovieData, currentRound?.movieB]);
 
-  // Resize canvas
+  // Redimensionar canvas
   useEffect(() => {
     const handleResize = () => {
       if (canvasRef.current && containerRef.current) {
@@ -59,29 +60,29 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Sync timer to server timestamp so all clients (admin + viewers) finish at the same wall-clock time.
-  // targetTime is always derived from bracket.roundStartedAt (server source of truth),
-  // ensuring every client — regardless of when they open the page — sees the correct remaining time.
+  // Sincroniza o cronômetro com o timestamp do servidor para que todos os clientes (admin + espectadores) terminem no mesmo horário real.
+  // targetTime é sempre derivado de bracket.roundStartedAt (fonte da verdade do servidor),
+  // garantindo que todos os clientes — independentemente de quando abrirem a página — vejam o tempo restante correto.
   useEffect(() => {
     if (!bracket?.roundStartedAt) return;
     hasAdvancedRef.current = false;
+    zeroTicksRef.current = 0;
 
     const targetTime = new Date(bracket.roundStartedAt).getTime() + roundDuration * 1000;
     const initialRemaining = Math.max(0, Math.ceil((targetTime - nowCorrected()) / 1000));
     setTimeLeft(initialRemaining);
 
-    // If the timer was already expired when this round was mounted (e.g. page reload),
-    // mark it so the interval does NOT auto-trigger handleRoundEnd.
-    // The admin can still advance manually via "Pular Round".
+    // Se o cronômetro já estava expirado quando este round foi montado (ex: recarregamento de página ou delay de rede),
+    // marca-o inicialmente para aguardar a tolerância de sincronização do fallback (2s) antes de avançar.
     timerExpiredOnMountRef.current = initialRemaining <= 0;
 
   }, [bracket?.currentRound, roundDuration, bracket?.roundStartedAt, nowCorrected]);
 
 
-  // 2. Keep the latest handleRoundEnd function in a ref to avoid interval restarts
+  // 2. Mantém a função handleRoundEnd mais recente em uma ref para evitar reinicializações do intervalo
   const handleRoundEndRef = useRef();
 
-  // 3. The tick interval
+  // 3. Intervalo de contagem (tick)
   useEffect(() => {
     if (isFinished || showingResult) return;
 
@@ -92,7 +93,7 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
       const remaining = Math.max(0, Math.ceil((targetTime - nowCorrected()) / 1000));
       setTimeLeft(remaining);
         
-      // Urgency effects
+      // Efeitos de urgência
       if (remaining <= 10 && remaining > 0) {
         if (remaining <= 5) {
           setShakeActive(true);
@@ -100,14 +101,27 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
         }
       }
 
-      // Time's up — show result for ALL users (visual), only admin advances backend.
-      // Guard: skip auto-advance if the timer was already expired when the component mounted
-      // (prevents false winner declaration on page reload / re-open).
-      if (remaining <= 0 && !hasAdvancedRef.current && !timerExpiredOnMountRef.current) {
-        hasAdvancedRef.current = true;
-        if (handleRoundEndRef.current) {
-          setTimeout(() => handleRoundEndRef.current(), 0);
+      // Tempo esgotado — mostra o resultado para TODOS os usuários (visual), apenas o admin avança o backend.
+      if (remaining <= 0 && !hasAdvancedRef.current) {
+        if (!timerExpiredOnMountRef.current) {
+          // Expiração normal durante a visualização: avança imediatamente
+          hasAdvancedRef.current = true;
+          if (handleRoundEndRef.current) {
+            setTimeout(() => handleRoundEndRef.current(), 0);
+          }
+        } else {
+          // Fallback de segurança: Se o round iniciou já zerado (ex: aba em segundo plano ou delay de rede),
+          // aguarda 2 segundos para sincronizar votos e então avança automaticamente para evitar congelamento da tela.
+          zeroTicksRef.current = (zeroTicksRef.current || 0) + 1;
+          if (zeroTicksRef.current >= 2) {
+            hasAdvancedRef.current = true;
+            if (handleRoundEndRef.current) {
+              setTimeout(() => handleRoundEndRef.current(), 0);
+            }
+          }
         }
+      } else if (remaining > 0) {
+        zeroTicksRef.current = 0;
       }
     }, 1000);
 
@@ -115,7 +129,7 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
   }, [isFinished, showingResult, bracket?.roundStartedAt, roundDuration, nowCorrected]);
 
 
-  // Poll votes for current round
+  // Consulta (polling) dos votos para o round atual
   useEffect(() => {
     if (isFinished || showingResult) return;
 
@@ -133,7 +147,7 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
           setLocalVotesB(b);
         }
       } catch (e) {
-        // silent
+        // silencioso
       }
     };
 
@@ -142,11 +156,11 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
     return () => clearInterval(interval);
   }, [API_URL, bracket?.currentRound, currentRound?.movieA, currentRound?.movieB, isFinished, showingResult]);
 
-  // Reset internal state when the round changes OR when a new tournament starts.
-  // IMPORTANT: dependency includes roundStartedAt (unique per round/tournament) because
-  // currentRound alone is insufficient — a new tournament always starts at currentRound=0,
-  // same as the previous one, so the effect would never re-fire and showingResult/
-  // showChampion would remain true from the old tournament (admin-only bug).
+  // Redefine o estado interno quando o round muda OU quando um novo torneio começa.
+  // IMPORTANTE: a dependência inclui roundStartedAt (único por round/torneio) porque
+  // apenas currentRound é insuficiente — um novo torneio sempre começa em currentRound=0,
+  // assim como o anterior, portanto o efeito nunca seria redisparado e showingResult/
+  // showChampion continuariam como true do torneio antigo (bug exclusivo do admin).
   useEffect(() => {
     setShowingResult(false);
     setRoundWinner(null);
@@ -155,11 +169,12 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
     setLocalVotesB(0);
     hasAdvancedRef.current = false;
     timerExpiredOnMountRef.current = false;
+    zeroTicksRef.current = 0;
     clearInterval(nextRoundTimerRef.current);
     clearTimeout(autoAdvanceRef.current);
   }, [bracket?.currentRound, bracket?.roundStartedAt]);
 
-  // Champion screen
+  // Tela de campeão
   useEffect(() => {
     if (isFinished && bracket?.champion) {
       setShowChampion(true);
@@ -167,7 +182,7 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
     }
   }, [isFinished, bracket?.champion, emitConfetti]);
 
-  // Handle round end — visual result for everyone, backend advance for admin only
+  // Lida com o fim do round — resultado visual para todos, avanço no backend apenas para o admin
   const handleRoundEnd = useCallback(async () => {
     clearInterval(nextRoundTimerRef.current);
 
@@ -180,7 +195,7 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
       setNextRoundTimeLeft(prev => Math.max(0, prev - 1));
     }, 1000);
 
-    // Only admin actually advances the round on the backend
+    // Apenas o admin de fato avança o round no backend
     if (isAdmin && onNextRound) {
       autoAdvanceRef.current = setTimeout(async () => {
         clearInterval(nextRoundTimerRef.current);
@@ -194,12 +209,12 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
     };
   }, [localVotesA, localVotesB, currentRound, onNextRound, isAdmin]);
 
-  // Keep the ref updated with the latest callback
+  // Mantém a ref atualizada com o callback mais recente
   useEffect(() => {
     handleRoundEndRef.current = handleRoundEnd;
   }, [handleRoundEnd]);
 
-  // Cleanup
+  // Limpeza (cleanup)
   useEffect(() => {
     return () => {
       clearInterval(timerRef.current);
@@ -209,13 +224,13 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
     };
   }, [stopAll]);
 
-  // Accept optimistic bracket vote from Twitch chat
+  // Aceita voto otimista do chaveamento vindo do chat da Twitch
   const handleBracketVote = useCallback((choice) => {
     if (choice === 1) setLocalVotesA(prev => prev + 1);
     if (choice === 2) setLocalVotesB(prev => prev + 1);
   }, []);
 
-  // Expose to parent
+  // Expõe para o componente pai
   useEffect(() => {
     window.__versusHandleBracketVote = handleBracketVote;
     return () => { delete window.__versusHandleBracketVote; };
@@ -228,7 +243,7 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
   const isCritical = timeLeft <= 5 && timeLeft > 0;
   const timerProgress = roundDuration > 0 ? (timeLeft / roundDuration) : 0;
 
-  // ── CHAMPION SCREEN ──
+  // ── TELA DE CAMPEÃO ──
   if (showChampion && bracket?.champion) {
     const champData = getMovieData(bracket.champion);
     return (
@@ -238,7 +253,7 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
           className="absolute inset-0 w-full h-full pointer-events-none z-20"
         />
 
-        {/* Background glow */}
+        {/* Brilho de fundo */}
         <div className="absolute inset-0 bg-gradient-radial from-amber-500/10 via-transparent to-transparent" />
         <div className="absolute inset-0" style={{
           background: 'radial-gradient(ellipse at center, rgba(255,215,0,0.08) 0%, transparent 70%)',
@@ -251,7 +266,7 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
             CAMPEÃO
           </h2>
 
-          {/* Poster */}
+          {/* Pôster */}
           {champData.posterPath && (
             <div className="relative mb-6">
               <div className="absolute -inset-2 bg-gradient-to-br from-amber-400/30 to-yellow-500/30 rounded-2xl blur-lg" />
@@ -278,7 +293,7 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
             </div>
           )}
 
-          {/* Bracket Summary */}
+          {/* Resumo do Chaveamento */}
           <div className="bg-white/5 border border-white/10 rounded-xl p-4 mt-4 max-w-md w-full">
             <h4 className="text-xs text-gray-500 uppercase tracking-wider mb-3 text-center">Resultados do Torneio</h4>
             {bracket.rounds.map((round, i) => (
@@ -308,7 +323,7 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
     );
   }
 
-  // ── VERSUS SCREEN ──
+  // ── TELA DE VERSUS ──
   if (!currentRound?.movieA || !currentRound?.movieB) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -323,13 +338,13 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
       className={`relative overflow-hidden rounded-2xl border border-white/10 ${shakeActive ? 'animate-screenShake' : ''}`}
       style={{ minHeight: '70vh' }}
     >
-      {/* Particle Canvas */}
+      {/* Canvas de Partículas */}
       <canvas
         ref={canvasRef}
         className="absolute inset-0 w-full h-full pointer-events-none z-30"
       />
 
-      {/* Round Label + Bracket Mini */}
+      {/* Rótulo do Round + Mini Chaveamento */}
       <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-3 sm:p-4">
         <div className="flex items-center gap-2">
           <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-amber-400 bg-amber-500/15 px-2.5 py-1 rounded-lg border border-amber-500/20">
@@ -342,7 +357,7 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
           )}
         </div>
 
-        {/* Mini Bracket */}
+        {/* Mini Chaveamento */}
         <div className="flex items-center gap-1 bg-black/40 backdrop-blur-sm rounded-lg px-2 py-1 border border-white/10">
           {bracket.rounds.map((r, i) => (
             <div
@@ -360,7 +375,7 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
         </div>
       </div>
 
-      {/* Timer */}
+      {/* Cronômetro */}
       {!showingResult && (
         <div className="absolute top-12 sm:top-14 left-1/2 -translate-x-1/2 z-20">
           <div className={`relative flex flex-col items-center ${isUrgent ? 'animate-urgentPulse' : ''} rounded-full`}>
@@ -389,10 +404,10 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
         </div>
       )}
 
-      {/* Main Split View */}
+      {/* Visão Dividida Principal (Split View) */}
       <div className="flex h-full" style={{ minHeight: '70vh' }}>
 
-        {/* Movie A (Left — Cyan/Blue) */}
+        {/* Filme A (Esquerda — Ciano/Azul) */}
         <div
           key={`movieA-${currentRound.movieA}`}
           className="relative overflow-hidden transition-all duration-1000 ease-in-out"
@@ -402,7 +417,7 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
             animation: !showingResult ? 'versusSlideLeft 0.8s cubic-bezier(0.16, 1, 0.3, 1)' : undefined
           }}
         >
-          {/* Background poster */}
+          {/* Pôster de fundo */}
           {movieA.posterPath && (
             <img
               src={`${TMDB_IMAGE_URL}${movieA.posterPath}`}
@@ -416,26 +431,32 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
               : 'bg-gradient-to-r from-cyan-900/80 via-cyan-900/60 to-black/80'
           }`} />
 
-          {/* Content */}
-          <div className="relative z-10 h-full flex flex-col items-center justify-center p-4 sm:p-8">
+          {/* Conteúdo */}
+          <div className="relative z-10 h-full flex flex-col items-center justify-center p-4 sm:p-8 pb-28 sm:pb-32">
             <span className="text-4xl sm:text-6xl font-black text-cyan-400/30 absolute top-16 left-4">!1</span>
 
             {movieA.posterPath && (
               <img
                 src={`${TMDB_IMAGE_URL}${movieA.posterPath}`}
                 alt={currentRound.movieA}
-                className="w-28 sm:w-40 rounded-xl shadow-2xl shadow-cyan-500/20 border border-cyan-500/30 mb-4"
+                className="w-28 sm:w-40 rounded-xl shadow-2xl shadow-cyan-500/20 border border-cyan-500/30 mb-3"
               />
+            )}
+
+            {showingResult && roundWinner === currentRound.movieA && (
+              <div className="mb-2 animate-fadeIn">
+                <span className="text-amber-400 font-bold text-lg animate-glowPulse">⚡ VENCEDOR</span>
+              </div>
             )}
 
             <h3 className="text-lg sm:text-2xl font-bold text-white text-center mb-1 drop-shadow-lg">
               {currentRound.movieA}
             </h3>
             {movieA.year && (
-              <p className="text-cyan-300/70 text-xs mb-2">{movieA.year}</p>
+              <p className="text-cyan-300/70 text-xs mb-1">{movieA.year}</p>
             )}
 
-            <div className="mt-2">
+            <div className="mt-1">
               <span className="text-3xl sm:text-5xl font-black text-white drop-shadow-lg">
                 {localVotesA}
               </span>
@@ -443,16 +464,10 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
                 {totalVotes > 0 ? `${percentA.toFixed(0)}%` : '—'}
               </p>
             </div>
-
-            {showingResult && roundWinner === currentRound.movieA && (
-              <div className="mt-4 animate-fadeIn">
-                <span className="text-amber-400 font-bold text-lg animate-glowPulse">⚡ VENCEDOR</span>
-              </div>
-            )}
           </div>
         </div>
 
-        {/* VS Badge (Center) */}
+        {/* Emblema VS (Centro) */}
         <div className={`absolute inset-0 flex items-center justify-center z-20 pointer-events-none transition-all duration-700 ${showingResult ? 'opacity-0 scale-50' : 'opacity-100 scale-100'}`}>
           <div
             className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center font-black text-xl sm:text-2xl border-2 ${
@@ -466,7 +481,7 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
           </div>
         </div>
 
-        {/* Result countdown (Moved to the Right Side) */}
+        {/* Contagem regressiva do resultado (Lado direito) */}
         {showingResult && (
           <div className="absolute top-16 right-4 sm:right-8 z-30 flex flex-col items-center bg-black/80 backdrop-blur-md px-6 py-5 rounded-2xl border border-emerald-500/50 shadow-2xl shadow-emerald-500/20 animate-championReveal">
             <span className="text-emerald-400 font-bold text-lg sm:text-xl mb-2 text-center drop-shadow-md">🎉 Vitória de {roundWinner}!</span>
@@ -481,7 +496,7 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
           </div>
         )}
 
-        {/* Movie B (Right — Red/Orange) */}
+        {/* Filme B (Direita — Vermelho/Laranja) */}
         <div
           key={`movieB-${currentRound.movieB}`}
           className="relative overflow-hidden transition-all duration-1000 ease-in-out"
@@ -491,7 +506,7 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
             animation: !showingResult ? 'versusSlideRight 0.8s cubic-bezier(0.16, 1, 0.3, 1)' : undefined
           }}
         >
-          {/* Background poster */}
+          {/* Pôster de fundo */}
           {movieB.posterPath && (
             <img
               src={`${TMDB_IMAGE_URL}${movieB.posterPath}`}
@@ -505,26 +520,32 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
               : 'bg-gradient-to-l from-red-900/80 via-red-900/60 to-black/80'
           }`} />
 
-          {/* Content */}
-          <div className="relative z-10 h-full flex flex-col items-center justify-center p-4 sm:p-8">
+          {/* Conteúdo */}
+          <div className="relative z-10 h-full flex flex-col items-center justify-center p-4 sm:p-8 pb-28 sm:pb-32">
             <span className="text-4xl sm:text-6xl font-black text-red-400/30 absolute top-16 right-4">!2</span>
 
             {movieB.posterPath && (
               <img
                 src={`${TMDB_IMAGE_URL}${movieB.posterPath}`}
                 alt={currentRound.movieB}
-                className="w-28 sm:w-40 rounded-xl shadow-2xl shadow-red-500/20 border border-red-500/30 mb-4"
+                className="w-28 sm:w-40 rounded-xl shadow-2xl shadow-red-500/20 border border-red-500/30 mb-3"
               />
+            )}
+
+            {showingResult && roundWinner === currentRound.movieB && (
+              <div className="mb-2 animate-fadeIn">
+                <span className="text-amber-400 font-bold text-lg animate-glowPulse">⚡ VENCEDOR</span>
+              </div>
             )}
 
             <h3 className="text-lg sm:text-2xl font-bold text-white text-center mb-1 drop-shadow-lg">
               {currentRound.movieB}
             </h3>
             {movieB.year && (
-              <p className="text-red-300/70 text-xs mb-2">{movieB.year}</p>
+              <p className="text-red-300/70 text-xs mb-1">{movieB.year}</p>
             )}
 
-            <div className="mt-2">
+            <div className="mt-1">
               <span className="text-3xl sm:text-5xl font-black text-white drop-shadow-lg">
                 {localVotesB}
               </span>
@@ -532,20 +553,14 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
                 {totalVotes > 0 ? `${percentB.toFixed(0)}%` : '—'}
               </p>
             </div>
-
-            {showingResult && roundWinner === currentRound.movieB && (
-              <div className="mt-4 animate-fadeIn">
-                <span className="text-amber-400 font-bold text-lg animate-glowPulse">⚡ VENCEDOR</span>
-              </div>
-            )}
           </div>
         </div>
       </div>
 
-      {/* Progress Bar (Tug of War) */}
+      {/* Barra de Progresso (Cabo de Guerra / Tug of War) */}
       <div className="absolute bottom-0 left-0 right-0 z-20 p-3 sm:p-4">
         <div className="bg-black/60 backdrop-blur-sm rounded-xl p-3 border border-white/10">
-          {/* Vote counts */}
+          {/* Contagem de votos */}
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <span className="text-cyan-400 font-bold text-sm">{localVotesA}</span>
@@ -558,19 +573,19 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
             </div>
           </div>
 
-          {/* The tug-of-war bar */}
+          {/* Barra do cabo de guerra */}
           <div className="h-3 sm:h-4 bg-gray-800 rounded-full overflow-hidden relative">
-            {/* Movie A side */}
+            {/* Lado do Filme A */}
             <div
               className="absolute left-0 top-0 h-full bg-gradient-to-r from-cyan-500 to-cyan-400 rounded-l-full transition-all duration-500 ease-out"
               style={{ width: `${percentA}%` }}
             />
-            {/* Movie B side */}
+            {/* Lado do Filme B */}
             <div
               className="absolute right-0 top-0 h-full bg-gradient-to-l from-red-500 to-red-400 rounded-r-full transition-all duration-500 ease-out"
               style={{ width: `${percentB}%` }}
             />
-            {/* Collision point glow */}
+            {/* Ponto de colisão e brilho */}
             {totalVotes > 0 && (
               <div
                 className="absolute top-1/2 -translate-y-1/2 w-3 h-6 sm:h-8"
@@ -584,7 +599,7 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
             )}
           </div>
 
-          {/* Percentage */}
+          {/* Porcentagens */}
           <div className="flex justify-between mt-1.5">
             <span className="text-cyan-400/70 text-[10px] font-medium">
               {totalVotes > 0 ? `${percentA.toFixed(0)}%` : '50%'}
@@ -594,7 +609,7 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
             </span>
           </div>
 
-          {/* Voting instructions */}
+          {/* Instruções de votação */}
           {!showingResult && (
             <p className="text-center text-[10px] text-gray-500 mt-2">
               Vote no chat: <code className="text-cyan-400">!1</code> ou <code className="text-red-400">!2</code>
@@ -603,7 +618,7 @@ export default function VersusScreen({ bracket, ranking, onNextRound, onEndBrack
         </div>
       </div>
 
-      {/* Admin Manual Controls (fallback) */}
+      {/* Controles Manuais do Admin (fallback) */}
       {isAdmin && !showingResult && (
         <div className="absolute bottom-32 sm:bottom-36 right-3 sm:right-4 z-20 flex flex-col gap-2">
           <button
